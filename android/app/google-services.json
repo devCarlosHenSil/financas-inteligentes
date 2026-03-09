@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "443207504457",
+    "project_id": "financas-inteligentes-b67db",
+    "storage_bucket": "financas-inteligentes-b67db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:443207504457:android:73b49ea0f852035c262598",
+        "android_client_info": {
+          "package_name": "com.example.financas_inteligentes"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "443207504457-tc6ba4fo4d1nrf6g8miqvti995cripum.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjs-X7Sb7quhJFBM4xJKoPi5wYEdGQo38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "443207504457-tc6ba4fo4d1nrf6g8miqvti995cripum.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "443207504457-9nd51tdnubbknsi42vfbhtb2fak5vfrj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.financasInteligentes"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:443207504457:android:4073239285888594262598",
+        "android_client_info": {
+          "package_name": "com.xentylabs.financas_inteligentes"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "443207504457-tc6ba4fo4d1nrf6g8miqvti995cripum.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjs-X7Sb7quhJFBM4xJKoPi5wYEdGQo38"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "443207504457-tc6ba4fo4d1nrf6g8miqvti995cripum.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "443207504457-9nd51tdnubbknsi42vfbhtb2fak5vfrj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.financasInteligentes"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
