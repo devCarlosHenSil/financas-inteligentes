@@ -35,6 +35,71 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     'Outros',
   ];
 
+  final Map<String, List<String>> _ativosPorTipo = const {
+    'Ações': [
+      'ITSA3 - Itaúsa',
+      'PETR4 - Petrobras',
+      'VALE3 - Vale',
+      'WEGE3 - WEG',
+      'BBAS3 - Banco do Brasil',
+      'ABEV3 - Ambev',
+    ],
+    'Fundos de Investimentos': [
+      'ALZR11 - Alianza Trust Renda Imobiliária',
+      'CPTS11 - Capitania Securities II',
+      'RBRF11 - RBR Alpha Multiestratégia',
+      'MXRF11 - Maxi Renda',
+    ],
+    'FIIs': [
+      'HGLG11 - CSHG Logística',
+      'KNRI11 - Kinea Renda Imobiliária',
+      'VISC11 - Vinci Shopping Centers',
+      'XPLG11 - XP Log',
+    ],
+    'Criptomoedas': [
+      'BTC - Bitcoin',
+      'ETH - Ethereum',
+      'SOL - Solana',
+      'XRP - XRP',
+    ],
+    'Stock': [
+      'AAPL - Apple',
+      'MSFT - Microsoft',
+      'GOOGL - Alphabet',
+      'AMZN - Amazon',
+    ],
+    'Reit': [
+      'O - Realty Income',
+      'PLD - Prologis',
+      'SPG - Simon Property Group',
+      'DLR - Digital Realty',
+    ],
+    'BDRs': [
+      'AAPL34 - Apple',
+      'MSFT34 - Microsoft',
+      'GOGL34 - Alphabet',
+      'AMZO34 - Amazon',
+    ],
+    'ETF': [
+      'BOVA11 - iShares Ibovespa',
+      'SMAL11 - iShares Small Cap',
+      'IVVB11 - iShares S&P 500',
+      'HASH11 - Hashdex Nasdaq Crypto Index',
+    ],
+    'ETFs Internacionais': [
+      'VOO - Vanguard S&P 500 ETF',
+      'QQQ - Invesco QQQ Trust',
+      'VTI - Vanguard Total Stock Market ETF',
+      'SPY - SPDR S&P 500 ETF Trust',
+    ],
+    'Tesouro Direto': [
+      'Tesouro Selic 2029',
+      'Tesouro IPCA+ 2035',
+      'Tesouro Prefixado 2029',
+      'Tesouro IPCA+ com Juros Semestrais 2045',
+    ],
+  };
+
   Map<String, double> _quotes = {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
   List<MarketTicker> _topEtfs = [];
   List<MarketTicker> _topFiis = [];
