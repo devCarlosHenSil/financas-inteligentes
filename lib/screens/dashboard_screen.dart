@@ -209,6 +209,21 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
+  Widget _buildPieChart(List<_CategoryTotal> items, Color color) {
+    return SizedBox(
+      height: 220,
+      child: PieChart(
+        PieChartData(
+          sectionsSpace: 2,
+          centerSpaceRadius: 40,
+          sections: _getPieSections(items, color),
+          borderData: FlBorderData(show: false),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPieChartCard(String title, Map<String, double> data, Color color) {
     final items = _prepareChartData(data);
 
@@ -230,39 +245,12 @@ class DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('Sem dados para o mês atual')),
               )
             else ...[
-              SizedBox(
-                height: 220,
-                child: PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
-                    sections: _getPieSections(items, color),
-                    borderData: FlBorderData(show: false),
-                  ),
-                ),
-              ),
+              _buildPieChart(items, color),
               const SizedBox(height: 12),
               _buildLegend(items, color),
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPieChart(Map<String, double> data, Color baseColor) {
-    if (data.isEmpty) {
-      return const Center(
-        child: Text('Sem dados para o mês atual'),
-      );
-    }
-
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 42,
-        sections: _getPieSections(data, baseColor),
-        borderData: FlBorderData(show: false),
       ),
     );
   }
