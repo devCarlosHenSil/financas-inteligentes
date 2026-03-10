@@ -54,6 +54,11 @@ class FirestoreService {
     await db.collection('usuarios/$userId/investimentos').add(inv.toMap());
   }
 
+
+  Future<void> deleteInvestment(String id) async {
+    await db.collection('usuarios/$userId/investimentos').doc(id).delete();
+  }
+
   Stream<List<InvestmentModel>> getInvestments() {
     return db.collection('usuarios/$userId/investimentos').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => InvestmentModel.fromMap(doc.data(), doc.id)).toList();

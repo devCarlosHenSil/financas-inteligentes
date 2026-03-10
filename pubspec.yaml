@@ -41,6 +41,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   logger: ^2.2.0
   flutter_masked_text2: ^0.9.0  # Adicionado para formatação de moeda
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
 
 
 dev_dependencies:
