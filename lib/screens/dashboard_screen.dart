@@ -377,6 +377,186 @@ class DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
+                    icon: const Icon(Icons.receipt_long, size: 16),
+                    label: const Text('Transações', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
+                    icon: const Icon(Icons.trending_up, size: 16),
+                    label: const Text('Invest.', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+                    icon: const Icon(Icons.shopping_cart_checkout, size: 16),
+                    label: const Text('Compras', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = totalEntradas - totalSaidas;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard')),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 900;
+
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFooterActions(context, saldo, isNarrow: isNarrow),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isLoading) const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Entradas por Categoria',
+                          data: entradasPorCategoria,
+                          isIncome: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Saídas por Categoria',
+                          data: saidasPorCategoria,
+                          isIncome: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildFooterActions(context, saldo, isNarrow: isNarrow),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = totalEntradas - totalSaidas;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 1000;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Balanço: ${_currencyFormatter.format(saldo)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        SizedBox(width: isNarrow ? 8 : 10),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildInsightsAndActions(context, saldo),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
