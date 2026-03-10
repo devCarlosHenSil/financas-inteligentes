@@ -128,5 +128,21 @@ class ApiService {
     } catch (_) {
       return [];
     }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final results = (data['results'] as List<dynamic>? ?? []);
+
+    final items = results.map((item) {
+      final map = item as Map<String, dynamic>;
+      return MarketTicker(
+        symbol: map['symbol']?.toString() ?? '-',
+        price: (map['regularMarketPrice'] as num?)?.toDouble() ?? 0,
+        changePercent:
+            (map['regularMarketChangePercent'] as num?)?.toDouble() ?? 0,
+      );
+    }).toList();
+
+    items.sort((a, b) => b.changePercent.compareTo(a.changePercent));
+    return items.take(10).toList();
   }
 }
