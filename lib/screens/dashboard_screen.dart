@@ -177,7 +177,16 @@ class DashboardScreenState extends State<DashboardScreen> {
     required bool isIncome,
     required int touchedIndex,
   }) {
-    if (items.isEmpty) return [];
+    if (items.isEmpty) {
+      return [
+        PieChartSectionData(
+          value: 1,
+          color: const Color(0xFF64748B),
+          title: '',
+          radius: 72,
+        ),
+      ];
+    }
 
     final total = items.fold<double>(0.0, (sum, item) => sum + item.valor);
 
@@ -278,8 +287,10 @@ class DashboardScreenState extends State<DashboardScreen> {
           touchedIndex: touchedIndex,
         ),
         pieTouchData: PieTouchData(
-          enabled: true,
+          enabled: items.isNotEmpty,
           touchCallback: (event, response) {
+            if (items.isEmpty) return;
+
             final bool hasInteraction = event.isInterestedForInteractions;
             final int idx = hasInteraction
                 ? (response?.touchedSection?.touchedSectionIndex ?? -1)
