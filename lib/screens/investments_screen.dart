@@ -307,7 +307,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     IconData? icon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -319,17 +319,35 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18, color: const Color(0xFF64748B)),
-                const SizedBox(width: 8),
+                Icon(icon, size: 16, color: const Color(0xFF64748B)),
+                const SizedBox(width: 6),
               ],
-              Text(title, style: const TextStyle(fontSize: 14, color: Color(0xFF475569))),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(value, style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+            ),
+          ),
           if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Color(0xFF64748B))),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            ),
           ],
         ],
       ),
@@ -497,11 +515,23 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   const SizedBox(height: 14),
                   if (_loadingMarket) const LinearProgressIndicator(),
                   GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 1100 ? 4 : 2,
+                    crossAxisCount: MediaQuery.of(context).size.width > 1100
+                        ? 4
+                        : MediaQuery.of(context).size.width > 640
+                            ? 2
+                            : 1,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                     shrinkWrap: true,
-                    childAspectRatio: 2.2,
+                    childAspectRatio: MediaQuery.of(context).size.width > 1400
+                        ? 3.0
+                        : MediaQuery.of(context).size.width > 1100
+                            ? 2.4
+                            : MediaQuery.of(context).size.width > 800
+                                ? 2.0
+                                : MediaQuery.of(context).size.width > 640
+                                    ? 1.7
+                                    : 2.6,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
                       _summaryCard(
