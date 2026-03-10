@@ -101,86 +101,102 @@ class DashboardScreenState extends State<DashboardScreen> {
     return 'Bons gastos! Supérfluos estão baixos (${_currencyFormatter.format(totalSuperfluos)}). Continue assim!';
   }
 
-  List<_CategoryTotal> _prepareChartData(
-    Map<String, double> data, {
-    int maxItems = 6,
-    double minPercent = 0.05,
-  }) {
-    if (data.isEmpty) return [];
-
-    final ordered = data.entries
+  List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
+    final items = data.entries
         .map((entry) => _CategoryTotal(nome: entry.key, valor: entry.value))
         .toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
-
-    final total = ordered.fold<double>(0, (sum, item) => sum + item.valor);
-    final selected = <_CategoryTotal>[];
-    double outros = 0;
-
-    for (final item in ordered) {
-      final percent = total == 0 ? 0 : item.valor / total;
-      final shouldGroup = selected.length >= maxItems || percent < minPercent;
-
-      if (shouldGroup) {
-        outros += item.valor;
-      } else {
-        selected.add(item);
-      }
-    }
-
-    if (outros > 0) {
-      selected.add(_CategoryTotal(nome: 'Outros', valor: outros));
-    }
-
-    return selected;
+    return items;
   }
 
-  List<PieChartSectionData> _getPieSections(List<_CategoryTotal> items, Color baseColor) {
+  Color _categoryColor(String category, {required bool isIncome}) {
+    final name = category.toLowerCase().trim();
+
+    if (name.contains('super mercado') || name.contains('supermercado') || name.contains('mercado')) {
+      return const Color(0xFF43A047); // comida
+    }
+    if (name.contains('moradia') || name.contains('aluguel') || name.contains('casa')) {
+      return const Color(0xFF757575); // cinza
+    }
+    if (name.contains('uber') || name.contains('99')) {
+      return Colors.black; // preto
+    }
+    if (name.contains('lazer') || name.contains('entretenimento') || name.contains('viagem')) {
+      return const Color(0xFF1E88E5); // azul
+    }
+    if (name.contains('serviço de terceiros') || name.contains('servicos de terceiros') || name.contains('terceiros')) {
+      return const Color(0xFF00897B); // teal
+    }
+    if (name.contains('mercado livre')) {
+      return const Color(0xFFFDD835); // amarelo
+    }
+    if (name.contains('shopee')) {
+      return const Color(0xFFFF6D00); // laranja
+    }
+    if (name.contains('amazon')) {
+      return const Color(0xFFFF9900); // cor principal amazon
+    }
+    if (name.contains('magalu') || name.contains('magazine luiza')) {
+      return const Color(0xFF0086FF); // azul magalu
+    }
+    if (name.contains('pix para esposa') || name.contains('esposa')) {
+      return const Color(0xFF8E24AA); // roxo
+    }
+
+    if (isIncome) {
+      return const Color(0xFF66BB6A);
+    }
+
+    if (name.contains('saúde') || name.contains('saude') || name.contains('farmácia') || name.contains('farmacia')) {
+      return const Color(0xFFEF5350);
+    }
+    if (name.contains('internet') || name.contains('telefone') || name.contains('streaming')) {
+      return const Color(0xFF5C6BC0);
+    }
+    if (name.contains('educação') || name.contains('educacao')) {
+      return const Color(0xFF26A69A);
+    }
+
+    final hue = (name.codeUnits.fold<int>(0, (sum, c) => sum + c) % 360).toDouble();
+    return HSVColor.fromAHSV(1, hue, 0.55, 0.85).toColor();
+  }
+
+  List<PieChartSectionData> _getPieSections(
+    List<_CategoryTotal> items, {
+    required bool isIncome,
+  }) {
     if (items.isEmpty) return [];
 
     final total = items.fold<double>(0, (sum, item) => sum + item.valor);
-    final palette = [
-      baseColor,
-      baseColor.withAlpha((0.8 * 255).round()),
-      baseColor.withAlpha((0.65 * 255).round()),
-      baseColor.withAlpha((0.5 * 255).round()),
-      Colors.amber,
-      Colors.deepPurple.shade300,
-      Colors.blueGrey.shade400,
-    ];
 
     return List.generate(items.length, (index) {
       final item = items[index];
       final percent = total == 0 ? 0 : (item.valor / total) * 100;
+      final color = _categoryColor(item.nome, isIncome: isIncome);
 
       return PieChartSectionData(
         value: item.valor,
-        color: palette[index % palette.length],
-        title: percent >= 8 ? '${percent.toStringAsFixed(0)}%' : '',
-        radius: 84,
+        color: color,
+        title: '${percent.toStringAsFixed(1)}%',
+        radius: 86,
         titleStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
           color: Colors.white,
+          shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
         ),
       );
     });
   }
 
-  Widget _buildLegend(List<_CategoryTotal> items, Color baseColor) {
-    final palette = [
-      baseColor,
-      baseColor.withAlpha((0.8 * 255).round()),
-      baseColor.withAlpha((0.65 * 255).round()),
-      baseColor.withAlpha((0.5 * 255).round()),
-      Colors.amber,
-      Colors.deepPurple.shade300,
-      Colors.blueGrey.shade400,
-    ];
+  Widget _buildLegend(List<_CategoryTotal> items, {required bool isIncome}) {
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
 
     return Column(
       children: List.generate(items.length, (index) {
         final item = items[index];
+        final percent = total == 0 ? 0 : (item.valor / total) * 100;
+
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
@@ -189,19 +205,22 @@ class DashboardScreenState extends State<DashboardScreen> {
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: palette[index % palette.length],
+                  color: _categoryColor(item.nome, isIncome: isIncome),
                   shape: BoxShape.circle,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.nome,
                   overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(_currencyFormatter.format(item.valor)),
+              Text(
+                '${percent.toStringAsFixed(1)}% • ${_currencyFormatter.format(item.valor)}',
+                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+              ),
             ],
           ),
         );
@@ -209,26 +228,31 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
-  Widget _buildPieChart(List<_CategoryTotal> items, Color color) {
+  Widget _buildPieChart(List<_CategoryTotal> items, {required bool isIncome}) {
     return SizedBox(
-      height: 220,
+      height: 260,
       child: PieChart(
         PieChartData(
           sectionsSpace: 2,
-          centerSpaceRadius: 40,
-          sections: _getPieSections(items, color),
+          centerSpaceRadius: 44,
+          sections: _getPieSections(items, isIncome: isIncome),
           borderData: FlBorderData(show: false),
         ),
       ),
     );
   }
 
-  Widget _buildPieChartCard(String title, Map<String, double> data, Color color) {
+  Widget _buildPieChartCard({
+    required String title,
+    required Map<String, double> data,
+    required bool isIncome,
+  }) {
     final items = _prepareChartData(data);
 
     return Card(
-      elevation: 2,
+      elevation: 3,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -236,7 +260,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 32/2, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             if (items.isEmpty)
@@ -245,13 +269,70 @@ class DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('Sem dados para o mês atual')),
               )
             else ...[
-              _buildPieChart(items, color),
-              const SizedBox(height: 12),
-              _buildLegend(items, color),
+              _buildPieChart(items, isIncome: isIncome),
+              const SizedBox(height: 10),
+              _buildLegend(items, isIncome: isIncome),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNavigationActions(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1565C0),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TransactionsScreen()),
+            ),
+            icon: const Icon(Icons.receipt_long),
+            label: const Text('Transações'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const InvestmentsScreen()),
+            ),
+            icon: const Icon(Icons.trending_up),
+            label: const Text('Investimentos'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6A1B9A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ShoppingListScreen()),
+            ),
+            icon: const Icon(Icons.shopping_cart_checkout),
+            label: const Text('Lista de Compras'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -271,16 +352,25 @@ class DashboardScreenState extends State<DashboardScreen> {
               if (_isLoading) const SizedBox(height: 16),
               Text(
                 'Balanço: ${_currencyFormatter.format(saldo)}',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 38/1.6, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
-              _buildPieChartCard('Entradas por Categoria', entradasPorCategoria, Colors.green),
+              _buildPieChartCard(
+                title: 'Entradas por Categoria',
+                data: entradasPorCategoria,
+                isIncome: true,
+              ),
               const SizedBox(height: 16),
-              _buildPieChartCard('Saídas por Categoria', saidasPorCategoria, Colors.red),
+              _buildPieChartCard(
+                title: 'Saídas por Categoria',
+                data: saidasPorCategoria,
+                isIncome: false,
+              ),
               const SizedBox(height: 20),
               Card(
                 color: Colors.white,
                 elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(getGastosAnalise(), style: const TextStyle(fontSize: 16)),
@@ -290,6 +380,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               Card(
                 color: Colors.white,
                 elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
@@ -299,27 +390,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-                ),
-                child: const Text('Transações'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const InvestmentsScreen()),
-                ),
-                child: const Text('Investimentos'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ShoppingListScreen()),
-                ),
-                child: const Text('Lista de Compras'),
-              ),
+              _buildNavigationActions(context),
             ],
           ),
         ),
