@@ -5,6 +5,7 @@ import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class InvestmentsScreen extends StatefulWidget {
@@ -21,12 +22,16 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
 
   final List<String> _tiposCarteira = const [
     'Ações',
-    'Fundos Imobiliários',
-    'Renda Fixa',
+    'Fundos de Investimentos',
+    'FIIs',
+    'Criptomoedas',
+    'Stock',
+    'Reit',
+    'BDRs',
     'ETF',
+    'ETFs Internacionais',
     'Tesouro Direto',
-    'Cripto',
-    'Câmbio',
+    'Renda Fixa (CDB,LCI,LCA,LC,LF,RDB)',
     'Outros',
   ];
 
@@ -37,6 +42,35 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   bool _loadingMarket = true;
 
   Timer? _refreshTimer;
+
+  bool _isUsdType(String tipo) =>
+      tipo == 'Stock' || tipo == 'Reit' || tipo == 'ETFs Internacionais';
+
+  bool _isFundosInvestimentos(String tipo) => tipo == 'Fundos de Investimentos';
+
+  bool _isRendaFixa(String tipo) => tipo == 'Renda Fixa (CDB,LCI,LCA,LC,LF,RDB)';
+
+  bool _isOutros(String tipo) => tipo == 'Outros';
+
+  double _parsePtBrNumber(String value) {
+    final normalized = value.trim().replaceAll('.', '').replaceAll(',', '.');
+    return double.tryParse(normalized) ?? 0;
+  }
+
+  String _formatCurrency(double value, {String symbol = 'R\$'}) {
+    return NumberFormat.currency(locale: 'pt_BR', symbol: symbol, decimalDigits: 2)
+        .format(value);
+  }
+
+  String _formatDecimalValue(double value, int decimals) {
+    return NumberFormat.decimalPatternDigits(locale: 'pt_BR', decimalDigits: decimals)
+        .format(value);
+  }
+
+  String _formatDecimalInput(double value, int decimals) {
+    return NumberFormat.decimalPatternDigits(locale: 'pt_BR', decimalDigits: decimals)
+        .format(value <= 0 ? 0 : value);
+  }
 
   @override
   void initState() {
@@ -80,29 +114,60 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     final quantidadeController = TextEditingController(text: '1');
     final precoController = TextEditingController(text: '0,00');
     final custosController = TextEditingController(text: '0,00');
+    final valorInvestidoController = TextEditingController(text: '0,01');
+    final precoCotaController = TextEditingController(text: '0,00000000');
+    final emissorController = TextEditingController();
+    final taxaController = TextEditingController(text: '0,00');
+    final valorRendaFixaController = TextEditingController(text: '0,00');
+    final nomeOutroController = TextEditingController();
+    final jurosAnualController = TextEditingController(text: '0,00');
 
     String tipoSelecionado = _tiposCarteira.first;
     DateTime dataSelecionada = DateTime.now();
+    DateTime dataVencimento = DateTime.now().add(const Duration(days: 1));
     bool isCompra = true;
-
-    double parseCurrency(String value) {
-      return double.tryParse(value.trim().replaceAll('.', '').replaceAll(',', '.')) ?? 0;
-    }
+    bool liquidezDiaria = false;
+    String tipoTitulo = 'CDB';
+    String indexador = 'CDI';
+    String formaRendaFixa = 'Pós-fixado';
 
     await showDialog<void>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final quantidade = parseCurrency(quantidadeController.text);
-            final preco = parseCurrency(precoController.text);
-            final custos = parseCurrency(custosController.text);
-            final total = quantidade * preco + custos;
+            final isFundos = _isFundosInvestimentos(tipoSelecionado);
+            final isUsd = _isUsdType(tipoSelecionado);
+            final isRendaFixa = _isRendaFixa(tipoSelecionado);
+            final isOutros = _isOutros(tipoSelecionado);
+
+            final quantidade = _parsePtBrNumber(quantidadeController.text);
+            final preco = _parsePtBrNumber(precoController.text);
+            final custos = _parsePtBrNumber(custosController.text);
+            final valorInvestido = _parsePtBrNumber(valorInvestidoController.text);
+            final precoCota = _parsePtBrNumber(precoCotaController.text);
+            final valorRendaFixa = _parsePtBrNumber(valorRendaFixaController.text);
+            final jurosAnual = _parsePtBrNumber(jurosAnualController.text);
+
+            final totalAcoes = quantidade * preco + custos;
+            final totalFundos = valorInvestido + custos;
+            final totalRendaFixa = valorRendaFixa + custos;
+            final totalOutros = preco + custos + jurosAnual;
+
+            final total = isFundos
+                ? totalFundos
+                : isRendaFixa
+                    ? totalRendaFixa
+                    : isOutros
+                        ? totalOutros
+                        : totalAcoes;
+
+            final totalCotas = precoCota > 0 ? valorInvestido / precoCota : 0.0;
 
             return Dialog(
               insetPadding: const EdgeInsets.all(24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -132,27 +197,91 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       onSelectionChanged: (value) => setDialogState(() => isCompra = value.first),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: tipoSelecionado,
-                            decoration: const InputDecoration(labelText: 'Tipo de ativo'),
-                            items: _tiposCarteira
-                                .map((tipo) => DropdownMenuItem(value: tipo, child: Text(tipo)))
-                                .toList(),
-                            onChanged: (value) => setDialogState(() => tipoSelecionado = value ?? _tiposCarteira.first),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: ativoController,
-                            decoration: const InputDecoration(labelText: 'Ativo'),
-                          ),
-                        ),
-                      ],
+                    DropdownButtonFormField<String>(
+                      initialValue: tipoSelecionado,
+                      decoration: const InputDecoration(labelText: 'Tipo de ativo'),
+                      items: _tiposCarteira
+                          .map((tipo) => DropdownMenuItem(value: tipo, child: Text(tipo)))
+                          .toList(),
+                      onChanged: (value) => setDialogState(() {
+                        tipoSelecionado = value ?? _tiposCarteira.first;
+                        ativoController.clear();
+                      }),
                     ),
+                    const SizedBox(height: 10),
+                    if (!isRendaFixa && !isOutros)
+                      _AssetSearchField(
+                        controller: ativoController,
+                        tipoSelecionado: tipoSelecionado,
+                        isUsd: isUsd,
+                        isFundos: isFundos,
+                        onSelect: (asset) {
+                          if (isFundos) {
+                            precoCotaController.text = _formatDecimalInput(asset.price, 8);
+                          } else {
+                            final decimals = tipoSelecionado == 'Criptomoedas' || isUsd ? 8 : 2;
+                            precoController.text = _formatDecimalInput(asset.price, decimals);
+                          }
+                          setDialogState(() {});
+                        },
+                        api: _api,
+                      ),
+                    if (isOutros)
+                      TextField(
+                        controller: nomeOutroController,
+                        decoration: const InputDecoration(labelText: 'Nome do ativo'),
+                      ),
+                    if (isRendaFixa) ...[
+                      TextField(
+                        controller: emissorController,
+                        decoration: const InputDecoration(labelText: 'Emissor'),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: tipoTitulo,
+                        decoration: const InputDecoration(labelText: 'Tipo de título'),
+                        items: const [
+                          'CDB',
+                          'LCI',
+                          'LCA',
+                          'LC',
+                          'LF',
+                          'RDB',
+                          'Debênture',
+                          'CRI',
+                          'CRA',
+                          'CCB',
+                        ]
+                            .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                            .toList(),
+                        onChanged: (value) => setDialogState(() => tipoTitulo = value ?? 'CDB'),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: indexador,
+                        decoration: const InputDecoration(labelText: 'Indexador'),
+                        items: const ['CDI', 'CDI+', 'IPCA+']
+                            .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                            .toList(),
+                        onChanged: (value) => setDialogState(() => indexador = value ?? 'CDI'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: taxaController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 2, suffix: ' %')],
+                        decoration: const InputDecoration(labelText: 'Taxa do CDI'),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: formaRendaFixa,
+                        decoration: const InputDecoration(labelText: 'Forma (Opcional)'),
+                        items: const ['Pós-fixado', 'Pré-fixado']
+                            .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                            .toList(),
+                        onChanged: (value) => setDialogState(() => formaRendaFixa = value ?? 'Pós-fixado'),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -179,39 +308,135 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: quantidadeController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setDialogState(() {}),
-                            decoration: const InputDecoration(labelText: 'Quantidade'),
+                        if (!isFundos && !isRendaFixa)
+                          Expanded(
+                            child: TextField(
+                              controller: quantidadeController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              onChanged: (_) => setDialogState(() {}),
+                              decoration: const InputDecoration(labelText: 'Quantidade'),
+                            ),
                           ),
-                        ),
+                        if (isRendaFixa)
+                          Expanded(
+                            child: TextField(
+                              controller: valorRendaFixaController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 2)],
+                              onChanged: (_) => setDialogState(() {}),
+                              decoration: const InputDecoration(labelText: 'Valor em R\$ (Opcional)'),
+                            ),
+                          ),
                       ],
                     ),
+                    if (isFundos) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: valorInvestidoController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 2)],
+                              onChanged: (_) => setDialogState(() {}),
+                              decoration: const InputDecoration(labelText: 'Valor investido'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: precoCotaController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 8)],
+                              onChanged: (_) => setDialogState(() {}),
+                              decoration: const InputDecoration(labelText: 'Preço da cota em R\$'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (!isRendaFixa) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: precoController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          PtBrDecimalInputFormatter(decimalDigits: isUsd ? 8 : 2),
+                        ],
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: InputDecoration(labelText: isUsd ? 'Preço em US\$' : 'Preço em R\$'),
+                      ),
+                    ],
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: precoController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setDialogState(() {}),
-                            decoration: const InputDecoration(labelText: 'Preço em R\$'),
+                    if (!isRendaFixa)
+                      TextField(
+                        controller: custosController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 2)],
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: const InputDecoration(labelText: 'Outros custos (Opcional)'),
+                      ),
+                    if (isRendaFixa) ...[
+                      const SizedBox(height: 10),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Liquidez diária'),
+                        value: liquidezDiaria,
+                        onChanged: (value) => setDialogState(() => liquidezDiaria = value),
+                      ),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dataVencimento,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now().add(const Duration(days: 36500)),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => dataVencimento = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Data de vencimento',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
+                          child: Text(DateFormat('dd/MM/yyyy').format(dataVencimento)),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: custosController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setDialogState(() {}),
-                            decoration: const InputDecoration(labelText: 'Outros custos'),
-                          ),
+                      ),
+                    ],
+                    if (isOutros) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: jurosAnualController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [PtBrDecimalInputFormatter(decimalDigits: 2)],
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: const InputDecoration(labelText: 'Juros anual'),
+                      ),
+                    ],
+                    if (isFundos) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
+                        child: Row(
+                          children: [
+                            const Text('Total de cotas', style: TextStyle(fontWeight: FontWeight.w700)),
+                            const Spacer(),
+                            Text(
+                              _formatDecimalValue(totalCotas, 8),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -224,7 +449,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                           const Text('Valor total', style: TextStyle(fontWeight: FontWeight.w700)),
                           const Spacer(),
                           Text(
-                            _currency.format(total),
+                            _formatCurrency(total, symbol: isUsd ? 'US\$' : 'R\$'),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                           ),
                         ],
@@ -237,7 +462,12 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                         const Spacer(),
                         ElevatedButton.icon(
                           onPressed: () async {
-                            final ativo = ativoController.text.trim();
+                            final ativo = isRendaFixa
+                                ? '${emissorController.text.trim()} • $tipoTitulo • $indexador'
+                                : isOutros
+                                    ? nomeOutroController.text.trim()
+                                    : ativoController.text.trim();
+
                             if (ativo.isEmpty || total <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Preencha ativo e valores válidos.')),
@@ -260,7 +490,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                             if (context.mounted) Navigator.pop(context);
                           },
                           icon: const Icon(Icons.add),
-                          label: const Text('Adicionar lançamento'),
+                          label: const Text('+ Adicionar Lançamento'),
                         ),
                       ],
                     ),
@@ -277,6 +507,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     quantidadeController.dispose();
     precoController.dispose();
     custosController.dispose();
+    valorInvestidoController.dispose();
+    precoCotaController.dispose();
+    emissorController.dispose();
+    taxaController.dispose();
+    valorRendaFixaController.dispose();
+    nomeOutroController.dispose();
+    jurosAnualController.dispose();
   }
 
   Map<String, double> _distributionByType(List<InvestmentModel> data) {
@@ -759,5 +996,157 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
         ],
       ),
     );
+  }
+}
+
+
+class _AssetSearchField extends StatefulWidget {
+  const _AssetSearchField({
+    required this.controller,
+    required this.tipoSelecionado,
+    required this.api,
+    required this.onSelect,
+    required this.isUsd,
+    required this.isFundos,
+  });
+
+  final TextEditingController controller;
+  final String tipoSelecionado;
+  final ApiService api;
+  final ValueChanged<AssetOption> onSelect;
+  final bool isUsd;
+  final bool isFundos;
+
+  @override
+  State<_AssetSearchField> createState() => _AssetSearchFieldState();
+}
+
+class _AssetSearchFieldState extends State<_AssetSearchField> {
+  List<AssetOption> _options = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _search(widget.controller.text);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AssetSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tipoSelecionado != widget.tipoSelecionado) {
+      _options = [];
+      _search(widget.controller.text);
+    }
+  }
+
+  Future<void> _search(String value) async {
+    setState(() => _loading = true);
+    final results = await widget.api.searchAssetsByType(
+      tipo: widget.tipoSelecionado,
+      query: value,
+    );
+    if (!mounted) return;
+    setState(() {
+      _options = results;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: widget.controller,
+          decoration: InputDecoration(
+            labelText: 'Ativo',
+            suffixIcon: _loading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
+          onChanged: _search,
+        ),
+        if (_options.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _options.length,
+              itemBuilder: (context, index) {
+                final item = _options[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(item.label),
+                  subtitle: Text(
+                    '${item.currency == 'USD' ? 'US\$' : 'R\$'} ${item.price.toStringAsFixed(widget.isFundos || widget.tipoSelecionado == 'Criptomoedas' || widget.isUsd ? 8 : 2)}',
+                  ),
+                  onTap: () {
+                    widget.controller.text = item.label;
+                    widget.onSelect(item);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class PtBrDecimalInputFormatter extends TextInputFormatter {
+  PtBrDecimalInputFormatter({required this.decimalDigits, this.suffix = ''});
+
+  final int decimalDigits;
+  final String suffix;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      final empty = decimalDigits == 0 ? '0' : '0,${'0' * decimalDigits}';
+      return TextEditingValue(
+        text: '$empty$suffix',
+        selection: TextSelection.collapsed(offset: empty.length),
+      );
+    }
+
+    final parsed = double.parse(digits) / _pow10(decimalDigits);
+    final formatted = NumberFormat.decimalPatternDigits(
+      locale: 'pt_BR',
+      decimalDigits: decimalDigits,
+    ).format(parsed);
+    final text = '$formatted$suffix';
+
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  double _pow10(int exp) {
+    var value = 1.0;
+    for (var i = 0; i < exp; i++) {
+      value *= 10;
+    }
+    return value;
   }
 }
