@@ -82,12 +82,13 @@ class LoginScreenState extends State<LoginScreen> {
   }
 
   InputDecoration _inputDecoration({
-    required String label,
+    required String hint,
     required IconData icon,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
-      labelText: label,
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.black.withAlpha((0.58 * 255).round())),
       prefixIcon: Icon(icon),
       suffixIcon: suffixIcon,
       filled: true,
@@ -152,15 +153,25 @@ class LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(color: Colors.white.withAlpha((0.82 * 255).round())),
                       ),
                       const SizedBox(height: 24),
+                      const Text(
+                        'E-mail',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: _emailController,
                         focusNode: _emailFocus,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
-                        decoration: _inputDecoration(label: 'E-mail', icon: Icons.mail_outline),
+                        decoration: _inputDecoration(hint: 'seuemail@dominio.com', icon: Icons.mail_outline),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Senha',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: _passwordController,
                         focusNode: _passwordFocus,
@@ -168,7 +179,7 @@ class LoginScreenState extends State<LoginScreen> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _login(),
                         decoration: _inputDecoration(
-                          label: 'Senha',
+                          hint: 'Digite sua senha',
                           icon: Icons.lock_outline,
                           suffixIcon: IconButton(
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
