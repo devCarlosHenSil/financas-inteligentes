@@ -132,6 +132,11 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
         .format(value);
   }
 
+  String _formatDecimalInput(double value, int decimals) {
+    return NumberFormat.decimalPatternDigits(locale: 'pt_BR', decimalDigits: decimals)
+        .format(value <= 0 ? 0 : value);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -224,8 +229,6 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
 
             final totalCotas = precoCota > 0 ? valorInvestido / precoCota : 0.0;
 
-            final ativos = _ativosPorTipo[tipoSelecionado] ?? const <String>[];
-
             return Dialog(
               insetPadding: const EdgeInsets.all(24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -272,24 +275,21 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     ),
                     const SizedBox(height: 10),
                     if (!isRendaFixa && !isOutros)
-                      Autocomplete<String>(
-                        optionsBuilder: (textEditingValue) {
-                          if (textEditingValue.text.isEmpty) return ativos;
-                          return ativos.where(
-                            (item) => item.toLowerCase().contains(textEditingValue.text.toLowerCase()),
-                          );
+                      _AssetSearchField(
+                        controller: ativoController,
+                        tipoSelecionado: tipoSelecionado,
+                        isUsd: isUsd,
+                        isFundos: isFundos,
+                        onSelect: (asset) {
+                          if (isFundos) {
+                            precoCotaController.text = _formatDecimalInput(asset.price, 8);
+                          } else {
+                            final decimals = tipoSelecionado == 'Criptomoedas' || isUsd ? 8 : 2;
+                            precoController.text = _formatDecimalInput(asset.price, decimals);
+                          }
+                          setDialogState(() {});
                         },
-                        onSelected: (selection) => ativoController.text = selection,
-                        fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
-                          textController.text = ativoController.text;
-                          textController.selection = TextSelection.collapsed(offset: textController.text.length);
-                          return TextField(
-                            controller: textController,
-                            focusNode: focusNode,
-                            decoration: const InputDecoration(labelText: 'Ativo'),
-                            onChanged: (v) => ativoController.text = v,
-                          );
-                        },
+                        api: _api,
                       ),
                     if (isOutros)
                       TextField(
@@ -1060,6 +1060,116 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+class _AssetSearchField extends StatefulWidget {
+  const _AssetSearchField({
+    required this.controller,
+    required this.tipoSelecionado,
+    required this.api,
+    required this.onSelect,
+    required this.isUsd,
+    required this.isFundos,
+  });
+
+  final TextEditingController controller;
+  final String tipoSelecionado;
+  final ApiService api;
+  final ValueChanged<AssetOption> onSelect;
+  final bool isUsd;
+  final bool isFundos;
+
+  @override
+  State<_AssetSearchField> createState() => _AssetSearchFieldState();
+}
+
+class _AssetSearchFieldState extends State<_AssetSearchField> {
+  List<AssetOption> _options = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _search(widget.controller.text);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AssetSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tipoSelecionado != widget.tipoSelecionado) {
+      _options = [];
+      _search(widget.controller.text);
+    }
+  }
+
+  Future<void> _search(String value) async {
+    setState(() => _loading = true);
+    final results = await widget.api.searchAssetsByType(
+      tipo: widget.tipoSelecionado,
+      query: value,
+    );
+    if (!mounted) return;
+    setState(() {
+      _options = results;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: widget.controller,
+          decoration: InputDecoration(
+            labelText: 'Ativo',
+            suffixIcon: _loading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : null,
+          ),
+          onChanged: _search,
+        ),
+        if (_options.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _options.length,
+              itemBuilder: (context, index) {
+                final item = _options[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(item.label),
+                  subtitle: Text(
+                    '${item.currency == 'USD' ? 'US\$' : 'R\$'} ${item.price.toStringAsFixed(widget.isFundos || widget.tipoSelecionado == 'Criptomoedas' || widget.isUsd ? 8 : 2)}',
+                  ),
+                  onTap: () {
+                    widget.controller.text = item.label;
+                    widget.onSelect(item);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
