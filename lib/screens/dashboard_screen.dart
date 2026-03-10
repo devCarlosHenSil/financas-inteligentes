@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:financas_inteligentes/models/transaction_model.dart';
+import 'package:financas_inteligentes/screens/investments_screen.dart';
+import 'package:financas_inteligentes/screens/shopping_list_screen.dart';
 import 'package:financas_inteligentes/screens/transactions_screen.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -19,6 +21,16 @@ class _CategoryTotal {
 
   final String nome;
   final double valor;
+}
+
+class _CategorySelection {
+  _CategorySelection({
+    required this.item,
+    required this.percent,
+  });
+
+  final _CategoryTotal item;
+  final double percent;
 }
 
 class DashboardScreenState extends State<DashboardScreen> {
@@ -182,6 +194,58 @@ class DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  _CategorySelection? _selectedCategory(
+    List<_CategoryTotal> items,
+    int touchedIndex,
+  ) {
+    if (items.isEmpty || touchedIndex < 0 || touchedIndex >= items.length) {
+      return null;
+    }
+
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+    final selectedItem = items[touchedIndex];
+    final percent = total == 0 ? 0 : (selectedItem.valor / total) * 100;
+
+    return _CategorySelection(item: selectedItem, percent: percent);
+  }
+
+  Widget _buildCategoryList(List<_CategoryTotal> items, {required bool isIncome}) {
+    if (items.isEmpty) {
+      return const Text(
+        'Sem categorias no período.',
+        style: TextStyle(color: Colors.white70),
+      );
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: List.generate(items.length, (index) {
+        final item = items[index];
+        final color = _categoryColor(item.nome, isIncome: isIncome, index: index);
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              item.nome,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
   Widget _buildPieChart(
     List<_CategoryTotal> items, {
     required bool isIncome,
@@ -224,6 +288,7 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     final touchedIndex =
         isIncome ? _touchedIncomeIndex : _touchedExpenseIndex;
+    final selection = _selectedCategory(items, touchedIndex);
 
     return Container(
       decoration: BoxDecoration(
@@ -254,6 +319,20 @@ class DashboardScreenState extends State<DashboardScreen> {
                 touchedIndex: touchedIndex,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              selection == null
+                  ? 'Passe o mouse em uma fatia para ver a categoria.'
+                  : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildCategoryList(items, isIncome: isIncome),
           ],
         ),
       ),
@@ -267,43 +346,81 @@ class DashboardScreenState extends State<DashboardScreen> {
         ? 'Saldo positivo de ${_currencyFormatter.format(saldo)}. Continue investindo.'
         : 'Saldo negativo de ${_currencyFormatter.format(saldo)}. Ajuste gastos.';
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(getGastosAnalise()),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(sugestao),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const TransactionsScreen(),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              );
-            },
-            icon: const Icon(Icons.receipt_long),
-            label: const Text('Transações'),
-          ),
+                child: Text(getGastosAnalise()),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(sugestao),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TransactionsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long),
+                label: const Text('Transações'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const InvestmentsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.trending_up),
+                label: const Text('Investimentos'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ShoppingListScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.shopping_cart),
+                label: const Text('Lista de Compras'),
+              ),
+            ),
+          ],
         ),
       ],
     );
