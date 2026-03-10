@@ -35,7 +35,7 @@ class AssetOption {
 class ApiService {
   static const String _brapiProxyBaseUrl = String.fromEnvironment(
     'BRAPI_PROXY_BASE_URL',
-    defaultValue: 'https://us-central1-financas-inteligentes-b67db.cloudfunctions.net',
+    defaultValue: 'https://brapi-proxy.financasinteligentes.workers.dev',
   );
 
   Uri _brapiProxyUri(String path, Map<String, String?> params) {
@@ -202,79 +202,21 @@ class ApiService {
     return double.tryParse(value.toString()) ?? 0;
   }
 
-  double _pickFirstDouble(Map<String, dynamic> map, List<String> keys) {
-    for (final key in keys) {
-      if (map.containsKey(key)) {
-        final value = _toDouble(map[key]);
-        if (value != 0) return value;
-      }
-    }
-    return 0;
-  }
-
   Future<Map<String, double>> getRealtimeQuotes() async {
     try {
       final fxData = await _getJsonMap(
-        _brapiProxyUri('brapiCurrency', {'currency': 'USD-BRL,EUR-BRL'})
-            .toString(),
-        allowProxy: false,
+        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL',
       );
 
       final cryptoData = await _getJsonMap(
-        _brapiProxyUri('brapiCrypto', {'coin': 'BTC,ETH', 'currency': 'BRL'})
-            .toString(),
-        allowProxy: false,
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
       );
 
-      final fxList = (fxData['currency'] as List<dynamic>? ?? [])
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-
-      double currencyBid(String from, String to) {
-        final match = fxList.firstWhere(
-          (item) =>
-              (item['fromCurrency']?.toString().toUpperCase() ?? '') ==
-                  from.toUpperCase() &&
-              (item['toCurrency']?.toString().toUpperCase() ?? '') ==
-                  to.toUpperCase(),
-          orElse: () => {},
-        );
-        if (match.isEmpty) return 0;
-        return _toDouble(match['bidPrice']);
-      }
-
-      final cryptoList = (cryptoData['coins'] as List<dynamic>? ?? [])
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-
-      double cryptoPrice(String symbol) {
-        final match = cryptoList.firstWhere(
-          (item) =>
-              (item['coin']?.toString().toUpperCase() ??
-                      item['symbol']?.toString().toUpperCase() ??
-                      '') ==
-                  symbol.toUpperCase(),
-          orElse: () => {},
-        );
-        if (match.isEmpty) return 0;
-        return _pickFirstDouble(
-          match,
-          const [
-            'regularMarketPrice',
-            'lastPrice',
-            'price',
-            'close',
-            'bidPrice',
-            'askPrice',
-          ],
-        );
-      }
-
       return {
-        'USD': currencyBid('USD', 'BRL'),
-        'EUR': currencyBid('EUR', 'BRL'),
-        'BTC': cryptoPrice('BTC'),
-        'ETH': cryptoPrice('ETH'),
+        'USD': _toDouble(fxData['USDBRL']?['bid']),
+        'EUR': _toDouble(fxData['EURBRL']?['bid']),
+        'BTC': _toDouble(cryptoData['bitcoin']?['brl']),
+        'ETH': _toDouble(cryptoData['ethereum']?['brl']),
       };
     } catch (_) {
       return {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
