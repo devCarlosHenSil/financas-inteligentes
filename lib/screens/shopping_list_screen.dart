@@ -226,7 +226,9 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final placemarks = await placemarkFromCoordinates(
