@@ -6,7 +6,6 @@ import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:logger/logger.dart';
 
 class InvestmentsScreen extends StatefulWidget {
   const InvestmentsScreen({super.key});
@@ -18,7 +17,6 @@ class InvestmentsScreen extends StatefulWidget {
 class InvestmentsScreenState extends State<InvestmentsScreen> {
   final FirestoreService _service = FirestoreService();
   final ApiService _api = ApiService();
-  final Logger logger = Logger();
   final NumberFormat _currency = NumberFormat.currency(symbol: 'R\$');
 
   final TextEditingController _nomeController = TextEditingController();
@@ -70,29 +68,33 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
 
   Future<void> _refreshMarketData() async {
     setState(() => _loadingMarket = true);
-    try {
-      final results = await Future.wait([
-        _api.getRealtimeQuotes(),
-        _api.getTopEtfs(),
-        _api.getTopFiis(),
-        _api.getTopStocks(),
-      ]);
 
-      if (!mounted) return;
-      setState(() {
-        _quotes = results[0] as Map<String, double>;
-        _topEtfs = results[1] as List<MarketTicker>;
-        _topFiis = results[2] as List<MarketTicker>;
-        _topStocks = results[3] as List<MarketTicker>;
-        _loadingMarket = false;
-      });
-    } catch (e) {
-      logger.e('Erro ao carregar dados de mercado: $e');
-      if (!mounted) return;
-      setState(() => _loadingMarket = false);
+    final quotes = await _api.getRealtimeQuotes();
+    final etfs = await _api.getTopEtfs();
+    final fiis = await _api.getTopFiis();
+    final stocks = await _api.getTopStocks();
+
+    if (!mounted) return;
+
+    setState(() {
+      if (quotes.values.any((v) => v > 0)) {
+        _quotes = quotes;
+      }
+      if (etfs.isNotEmpty) _topEtfs = etfs;
+      if (fiis.isNotEmpty) _topFiis = fiis;
+      if (stocks.isNotEmpty) _topStocks = stocks;
+      _loadingMarket = false;
+    });
+
+    if (quotes.values.every((v) => v == 0) &&
+        etfs.isEmpty &&
+        fiis.isEmpty &&
+        stocks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Não foi possível atualizar os dados de mercado agora.'),
+          content: Text(
+            'Sem retorno das APIs agora. Tentando novamente na próxima atualização.',
+          ),
         ),
       );
     }

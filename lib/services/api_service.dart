@@ -15,30 +15,43 @@ class MarketTicker {
 }
 
 class ApiService {
-  Future<Map<String, double>> getRealtimeQuotes() async {
-    final fxResponse = await http.get(
-      Uri.parse('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL'),
-    );
-
-    final cryptoResponse = await http.get(
-      Uri.parse(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
-      ),
-    );
-
-    if (fxResponse.statusCode != 200 || cryptoResponse.statusCode != 200) {
-      throw Exception('Falha ao carregar cotações em tempo real.');
+  Future<Map<String, dynamic>> _getJsonMap(String url) async {
+    final direct = await http.get(Uri.parse(url));
+    if (direct.statusCode == 200) {
+      return jsonDecode(direct.body) as Map<String, dynamic>;
     }
 
-    final fxData = jsonDecode(fxResponse.body) as Map<String, dynamic>;
-    final cryptoData = jsonDecode(cryptoResponse.body) as Map<String, dynamic>;
+    final proxyUrl =
+        'https://api.allorigins.win/raw?url=${Uri.encodeComponent(url)}';
+    final proxy = await http.get(Uri.parse(proxyUrl));
+    if (proxy.statusCode == 200) {
+      return jsonDecode(proxy.body) as Map<String, dynamic>;
+    }
 
-    return {
-      'USD': double.tryParse(fxData['USDBRL']?['bid']?.toString() ?? '0') ?? 0,
-      'EUR': double.tryParse(fxData['EURBRL']?['bid']?.toString() ?? '0') ?? 0,
-      'BTC': (cryptoData['bitcoin']?['brl'] as num?)?.toDouble() ?? 0,
-      'ETH': (cryptoData['ethereum']?['brl'] as num?)?.toDouble() ?? 0,
-    };
+    throw Exception('Falha ao buscar dados de $url');
+  }
+
+  Future<Map<String, double>> getRealtimeQuotes() async {
+    try {
+      final fxData = await _getJsonMap(
+        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL',
+      );
+
+      final cryptoData = await _getJsonMap(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
+      );
+
+      return {
+        'USD':
+            double.tryParse(fxData['USDBRL']?['bid']?.toString() ?? '0') ?? 0,
+        'EUR':
+            double.tryParse(fxData['EURBRL']?['bid']?.toString() ?? '0') ?? 0,
+        'BTC': (cryptoData['bitcoin']?['brl'] as num?)?.toDouble() ?? 0,
+        'ETH': (cryptoData['ethereum']?['brl'] as num?)?.toDouble() ?? 0,
+      };
+    } catch (_) {
+      return {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
+    }
   }
 
   Future<List<MarketTicker>> getTopEtfs() {
@@ -93,13 +106,27 @@ class ApiService {
   }
 
   Future<List<MarketTicker>> _getTopBySymbols(List<String> symbols) async {
-    final uri = Uri.parse(
-      'https://brapi.dev/api/quote/${symbols.join(',')}?range=1d&interval=1d&fundamental=false&dividends=false',
-    );
+    try {
+      final data = await _getJsonMap(
+        'https://brapi.dev/api/quote/${symbols.join(',')}?range=1d&interval=1d&fundamental=false&dividends=false',
+      );
 
-    final response = await http.get(uri);
-    if (response.statusCode != 200) {
-      throw Exception('Falha ao carregar ranking de ativos.');
+      final results = (data['results'] as List<dynamic>? ?? []);
+
+      final items = results.map((item) {
+        final map = item as Map<String, dynamic>;
+        return MarketTicker(
+          symbol: map['symbol']?.toString() ?? '-',
+          price: (map['regularMarketPrice'] as num?)?.toDouble() ?? 0,
+          changePercent:
+              (map['regularMarketChangePercent'] as num?)?.toDouble() ?? 0,
+        );
+      }).toList();
+
+      items.sort((a, b) => b.changePercent.compareTo(a.changePercent));
+      return items.take(10).toList();
+    } catch (_) {
+      return [];
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
