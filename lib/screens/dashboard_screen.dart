@@ -280,15 +280,20 @@ class DashboardScreenState extends State<DashboardScreen> {
         pieTouchData: PieTouchData(
           enabled: true,
           touchCallback: (event, response) {
-            final idx = response?.touchedSection?.touchedSectionIndex ?? -1;
+            final bool hasInteraction = event.isInterestedForInteractions;
+            final int idx = hasInteraction
+                ? (response?.touchedSection?.touchedSectionIndex ?? -1)
+                : -1;
 
-            setState(() {
-              if (isIncome) {
-                _touchedIncomeIndex = idx;
-              } else {
-                _touchedExpenseIndex = idx;
-              }
-            });
+            if (!mounted) return;
+
+            if (isIncome) {
+              if (_touchedIncomeIndex == idx) return;
+              setState(() => _touchedIncomeIndex = idx);
+            } else {
+              if (_touchedExpenseIndex == idx) return;
+              setState(() => _touchedExpenseIndex = idx);
+            }
           },
         ),
       ),
@@ -428,8 +433,12 @@ class DashboardScreenState extends State<DashboardScreen> {
       elevation: 0,
       padding: const EdgeInsets.symmetric(vertical: 14),
       backgroundColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      disabledBackgroundColor: Colors.transparent,
+      disabledForegroundColor: Colors.white70,
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 
