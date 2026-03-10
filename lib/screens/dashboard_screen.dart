@@ -187,46 +187,47 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildLegend(List<_CategoryTotal> items, {required bool isIncome}) {
     final total = items.fold<double>(0, (sum, item) => sum + item.valor);
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 6.5,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 4,
-      ),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final percent = total == 0 ? 0 : (item.valor / total) * 100;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: GridView.builder(
+        itemCount: items.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 6.8,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 4,
+        ),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final percent = total == 0 ? 0 : (item.valor / total) * 100;
 
-        return Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: _categoryColor(item.nome, isIncome: isIncome),
-                shape: BoxShape.circle,
+          return Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: _categoryColor(item.nome, isIncome: isIncome),
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                item.nome,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  item.nome,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${percent.toStringAsFixed(1)}%',
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ],
-        );
-      },
+              const SizedBox(width: 4),
+              Text(
+                '${percent.toStringAsFixed(1)}%',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -278,79 +279,178 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             if (items.isEmpty)
               const Expanded(child: Center(child: Text('Sem dados para o mês atual')))
-            else ...[
-              Expanded(child: _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex)),
-              const SizedBox(height: 6),
-              _buildHoveredInfo(items, isIncome: isIncome, touchedIndex: touchedIndex),
-              const SizedBox(height: 8),
-              _buildLegend(items, isIncome: isIncome),
-            ],
+            else
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildHoveredInfo(items, isIncome: isIncome, touchedIndex: touchedIndex),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      flex: 4,
+                      child: _buildLegend(items, isIncome: isIncome),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFooterActions(BuildContext context, double saldo) {
-    return Row(
-      children: [
-        Expanded(
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text(getGastosAnalise(), maxLines: 2, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Text(
-                'Com ${_currencyFormatter.format(saldo)} de saldo, invista R\$100/mês para chegar a R\$1200 em 1 ano.',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+  Widget _buildFooterActions(BuildContext context, double saldo, {required bool isNarrow}) {
+    return SizedBox(
+      height: isNarrow ? 96 : 84,
+      child: Row(
+        children: [
+          Expanded(
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text(getGastosAnalise(), maxLines: 2, overflow: TextOverflow.ellipsis),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
-                  icon: const Icon(Icons.receipt_long, size: 16),
-                  label: const Text('Transações', overflow: TextOverflow.ellipsis),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text(
+                  'Com ${_currencyFormatter.format(saldo)} de saldo, invista R\$100/mês para chegar a R\$1200 em 1 ano.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
-                  icon: const Icon(Icons.trending_up, size: 16),
-                  label: const Text('Invest.', overflow: TextOverflow.ellipsis),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
-                  icon: const Icon(Icons.shopping_cart_checkout, size: 16),
-                  label: const Text('Compras', overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ],
+            ),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
+                    icon: const Icon(Icons.receipt_long, size: 16),
+                    label: const Text('Transações', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
+                    icon: const Icon(Icons.trending_up, size: 16),
+                    label: const Text('Invest.', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+                    icon: const Icon(Icons.shopping_cart_checkout, size: 16),
+                    label: const Text('Compras', overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = totalEntradas - totalSaidas;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard')),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 900;
+
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFooterActions(context, saldo, isNarrow: isNarrow),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isLoading) const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Entradas por Categoria',
+                          data: entradasPorCategoria,
+                          isIncome: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Saídas por Categoria',
+                          data: saidasPorCategoria,
+                          isIncome: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildFooterActions(context, saldo, isNarrow: isNarrow),
+              ],
+            );
+          },
         ),
       ],
     );
