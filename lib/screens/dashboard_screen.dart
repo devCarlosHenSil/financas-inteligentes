@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
@@ -17,6 +18,9 @@ class DashboardScreen extends StatefulWidget {
 
 class DashboardScreenState extends State<DashboardScreen> {
   final FirestoreService _service = FirestoreService();
+  StreamSubscription<List<TransactionModel>>? _transactionsSubscription;
+  bool _isLoading = true;
+
   double totalEntradas = 0, totalSaidas = 0, totalSuperfluos = 0;
   Map<String, double> entradasPorCategoria = {};
   Map<String, double> saidasPorCategoria = {};
@@ -24,34 +28,60 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _listenTransactions();
   }
 
-  void _loadData() async {
-    DateTime now = DateTime.now();
-    totalEntradas = await _service.getTotalEntradas(now);
-    totalSaidas = await _service.getTotalSaidas(now);
-    totalSuperfluos = await _service.getTotalSuperfluos(now);
+  void _listenTransactions() {
+    _transactionsSubscription = _service.getTransactions().listen((transactions) {
+      final now = DateTime.now();
+      final txMesAtual = transactions.where(
+        (t) => t.data.month == now.month && t.data.year == now.year,
+      );
 
-    // Calcular por categoria
-    final snapshot = await _service.db.collection('usuarios/${_service.userId}/transacoes').get();
-    entradasPorCategoria = {};
-    saidasPorCategoria = {};
-    for (var doc in snapshot.docs) {
-      final t = TransactionModel.fromMap(doc.data(), doc.id);
-      if (t.data.month == now.month && t.data.year == now.year) {
+      final Map<String, double> novasEntradasPorCategoria = {};
+      final Map<String, double> novasSaidasPorCategoria = {};
+      double novasEntradas = 0;
+      double novasSaidas = 0;
+      double novosSuperfluos = 0;
+
+      for (final t in txMesAtual) {
         if (t.tipo == 'entrada') {
-          entradasPorCategoria.update(t.categoria, (value) => value + t.valor, ifAbsent: () => t.valor);
-        } else {
-          saidasPorCategoria.update(t.categoria, (value) => value + t.valor, ifAbsent: () => t.valor);
+          novasEntradas += t.valor;
+          novasEntradasPorCategoria.update(
+            t.categoria,
+            (value) => value + t.valor,
+            ifAbsent: () => t.valor,
+          );
+        } else if (t.tipo == 'saida') {
+          novasSaidas += t.valor;
+          novasSaidasPorCategoria.update(
+            t.categoria,
+            (value) => value + t.valor,
+            ifAbsent: () => t.valor,
+          );
+        }
+
+        if (t.superfluo) {
+          novosSuperfluos += t.valor;
         }
       }
-    }
 
-    setState(() {});
-    _service.getTransactions().listen((list) {
-      setState(() {});
+      if (!mounted) return;
+      setState(() {
+        totalEntradas = novasEntradas;
+        totalSaidas = novasSaidas;
+        totalSuperfluos = novosSuperfluos;
+        entradasPorCategoria = novasEntradasPorCategoria;
+        saidasPorCategoria = novasSaidasPorCategoria;
+        _isLoading = false;
+      });
     });
+  }
+
+  @override
+  void dispose() {
+    _transactionsSubscription?.cancel();
+    super.dispose();
   }
 
   String getGastosAnalise() {
@@ -88,13 +118,30 @@ class DashboardScreenState extends State<DashboardScreen> {
         value: value,
         color: color,
         title: '$key\nR\$${value.toStringAsFixed(2)}',
-        radius: 120,  // Aumentado para mais espaço
-        titlePositionPercentageOffset: 1.5,  // Move o título mais para fora
+        radius: 90,
+        titlePositionPercentageOffset: 1.15,
         titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black),
       ));
       colorIndex++;
     });
     return sections;
+  }
+
+  Widget _buildPieChart(Map<String, double> data, Color baseColor) {
+    if (data.isEmpty) {
+      return const Center(
+        child: Text('Sem dados para o mês atual'),
+      );
+    }
+
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 2,
+        centerSpaceRadius: 42,
+        sections: _getPieSections(data, baseColor),
+        borderData: FlBorderData(show: false),
+      ),
+    );
   }
 
   @override
@@ -107,32 +154,20 @@ class DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_isLoading) const LinearProgressIndicator(),
+              if (_isLoading) const SizedBox(height: 16),
               Text('Balanço: ${NumberFormat.currency(symbol: 'R\$').format(totalEntradas - totalSaidas)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               const Text('Entradas por Categoria', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               SizedBox(
-                height: 300,  // Aumenta a altura para mais espaço
-                child: PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 50,
-                    sections: _getPieSections(entradasPorCategoria, Colors.green),
-                    borderData: FlBorderData(show: false),
-                  ),
-                ),
+                height: 300,
+                child: _buildPieChart(entradasPorCategoria, Colors.green),
               ),
               const SizedBox(height: 20),
               const Text('Saídas por Categoria', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               SizedBox(
-                height: 300,  // Aumenta a altura para mais espaço
-                child: PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 50,
-                    sections: _getPieSections(saidasPorCategoria, Colors.red),
-                    borderData: FlBorderData(show: false),
-                  ),
-                ),
+                height: 300,
+                child: _buildPieChart(saidasPorCategoria, Colors.red),
               ),
               const SizedBox(height: 20),
               Card(
