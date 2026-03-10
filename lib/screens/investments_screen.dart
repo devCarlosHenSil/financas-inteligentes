@@ -35,71 +35,6 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     'Outros',
   ];
 
-  final Map<String, List<String>> _ativosPorTipo = const {
-    'Ações': [
-      'ITSA3 - Itaúsa',
-      'PETR4 - Petrobras',
-      'VALE3 - Vale',
-      'WEGE3 - WEG',
-      'BBAS3 - Banco do Brasil',
-      'ABEV3 - Ambev',
-    ],
-    'Fundos de Investimentos': [
-      'ALZR11 - Alianza Trust Renda Imobiliária',
-      'CPTS11 - Capitania Securities II',
-      'RBRF11 - RBR Alpha Multiestratégia',
-      'MXRF11 - Maxi Renda',
-    ],
-    'FIIs': [
-      'HGLG11 - CSHG Logística',
-      'KNRI11 - Kinea Renda Imobiliária',
-      'VISC11 - Vinci Shopping Centers',
-      'XPLG11 - XP Log',
-    ],
-    'Criptomoedas': [
-      'BTC - Bitcoin',
-      'ETH - Ethereum',
-      'SOL - Solana',
-      'XRP - XRP',
-    ],
-    'Stock': [
-      'AAPL - Apple',
-      'MSFT - Microsoft',
-      'GOOGL - Alphabet',
-      'AMZN - Amazon',
-    ],
-    'Reit': [
-      'O - Realty Income',
-      'PLD - Prologis',
-      'SPG - Simon Property Group',
-      'DLR - Digital Realty',
-    ],
-    'BDRs': [
-      'AAPL34 - Apple',
-      'MSFT34 - Microsoft',
-      'GOGL34 - Alphabet',
-      'AMZO34 - Amazon',
-    ],
-    'ETF': [
-      'BOVA11 - iShares Ibovespa',
-      'SMAL11 - iShares Small Cap',
-      'IVVB11 - iShares S&P 500',
-      'HASH11 - Hashdex Nasdaq Crypto Index',
-    ],
-    'ETFs Internacionais': [
-      'VOO - Vanguard S&P 500 ETF',
-      'QQQ - Invesco QQQ Trust',
-      'VTI - Vanguard Total Stock Market ETF',
-      'SPY - SPDR S&P 500 ETF Trust',
-    ],
-    'Tesouro Direto': [
-      'Tesouro Selic 2029',
-      'Tesouro IPCA+ 2035',
-      'Tesouro Prefixado 2029',
-      'Tesouro IPCA+ com Juros Semestrais 2045',
-    ],
-  };
-
   Map<String, double> _quotes = {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
   List<MarketTicker> _topEtfs = [];
   List<MarketTicker> _topFiis = [];
@@ -1033,13 +968,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final positive = item.changePercent >= 0;
+                      final displayName = (item.name == null ||
+                              item.name!.isEmpty ||
+                              item.name == item.symbol)
+                          ? item.symbol
+                          : '${item.symbol} • ${item.name}';
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
                             Expanded(
                               child: Text(
-                                '${index + 1}. ${item.symbol}',
+                                '${index + 1}. $displayName',
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -1089,6 +1029,7 @@ class _AssetSearchField extends StatefulWidget {
 class _AssetSearchFieldState extends State<_AssetSearchField> {
   List<AssetOption> _options = [];
   bool _loading = false;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -1101,8 +1042,22 @@ class _AssetSearchFieldState extends State<_AssetSearchField> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tipoSelecionado != widget.tipoSelecionado) {
       _options = [];
-      _search(widget.controller.text);
+      _queueSearch(widget.controller.text);
     }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _queueSearch(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _search(value);
+    });
   }
 
   Future<void> _search(String value) async {
@@ -1138,7 +1093,7 @@ class _AssetSearchFieldState extends State<_AssetSearchField> {
                   )
                 : null,
           ),
-          onChanged: _search,
+          onChanged: _queueSearch,
         ),
         if (_options.isNotEmpty) ...[
           const SizedBox(height: 6),

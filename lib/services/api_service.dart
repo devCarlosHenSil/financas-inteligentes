@@ -7,11 +7,13 @@ class MarketTicker {
     required this.symbol,
     required this.price,
     required this.changePercent,
+    this.name,
   });
 
   final String symbol;
   final double price;
   final double changePercent;
+  final String? name;
 }
 
 class AssetOption {
@@ -27,10 +29,114 @@ class AssetOption {
   final double price;
   final String currency;
 
-  String get label => '$symbol - $name';
+  String get label => (name.trim().isEmpty || name == symbol) ? symbol : '$symbol - $name';
 }
 
 class ApiService {
+  static const Map<String, String> _fallbackNames = {
+    'ITSA3': 'Itausa',
+    'PETR4': 'Petrobras',
+    'VALE3': 'Vale',
+    'WEGE3': 'WEG',
+    'BBAS3': 'Banco do Brasil',
+    'ABEV3': 'Ambev',
+    'ALZR11': 'Alianza Trust Renda Imobiliaria',
+    'CPTS11': 'Capitania Securities II',
+    'RBRF11': 'RBR Alpha Multiestrategia',
+    'MXRF11': 'Maxi Renda',
+    'HGLG11': 'CSHG Logistica',
+    'KNRI11': 'Kinea Renda Imobiliaria',
+    'VISC11': 'Vinci Shopping Centers',
+    'XPLG11': 'XP Log',
+    'BTC': 'Bitcoin',
+    'ETH': 'Ethereum',
+    'SOL': 'Solana',
+    'XRP': 'XRP',
+    'AAPL': 'Apple',
+    'MSFT': 'Microsoft',
+    'GOOGL': 'Alphabet',
+    'AMZN': 'Amazon',
+    'O': 'Realty Income',
+    'PLD': 'Prologis',
+    'SPG': 'Simon Property Group',
+    'DLR': 'Digital Realty',
+    'AAPL34': 'Apple',
+    'MSFT34': 'Microsoft',
+    'GOGL34': 'Alphabet',
+    'AMZO34': 'Amazon',
+    'BOVA11': 'iShares Ibovespa',
+    'SMAL11': 'iShares Small Cap',
+    'IVVB11': 'iShares S&P 500',
+    'HASH11': 'Hashdex Nasdaq Crypto Index',
+    'VOO': 'Vanguard S&P 500 ETF',
+    'QQQ': 'Invesco QQQ Trust',
+    'VTI': 'Vanguard Total Stock Market ETF',
+    'SPY': 'SPDR S&P 500 ETF Trust',
+  };
+
+  static const Set<String> _knownBrEtfs = {
+    'BOVA11',
+    'SMAL11',
+    'IVVB11',
+    'HASH11',
+    'DIVO11',
+    'ECOO11',
+    'XFIX11',
+    'XBOV11',
+    'PIBB11',
+    'GOVE11',
+    'BOVV11',
+    'SPXI11',
+  };
+
+  static const List<String> _defaultBrStocks = [
+    'ITSA3',
+    'PETR4',
+    'VALE3',
+    'WEGE3',
+    'BBAS3',
+    'ABEV3',
+  ];
+
+  static const List<String> _defaultBrFiis = [
+    'ALZR11',
+    'CPTS11',
+    'RBRF11',
+    'MXRF11',
+    'HGLG11',
+    'KNRI11',
+    'VISC11',
+    'XPLG11',
+  ];
+
+  static const List<String> _defaultBrBdrs = [
+    'AAPL34',
+    'MSFT34',
+    'GOGL34',
+    'AMZO34',
+  ];
+
+  static const List<String> _defaultUsStocks = [
+    'AAPL',
+    'MSFT',
+    'GOOGL',
+    'AMZN',
+  ];
+
+  static const List<String> _defaultUsReits = [
+    'O',
+    'PLD',
+    'SPG',
+    'DLR',
+  ];
+
+  static const List<String> _defaultUsEtfs = [
+    'VOO',
+    'QQQ',
+    'VTI',
+    'SPY',
+  ];
+
   Future<dynamic> _getJson(String url) async {
     final direct = await http.get(Uri.parse(url));
     if (direct.statusCode == 200) {
@@ -84,25 +190,38 @@ class ApiService {
     required String tipo,
     String query = '',
   }) async {
+    final cleanedQuery = query.trim();
     if (tipo == 'Criptomoedas') {
-      return _searchCryptoAssets(query: query);
+      return _searchCryptoAssets(query: cleanedQuery);
     }
 
     if (tipo == 'Stock' || tipo == 'Reit' || tipo == 'ETFs Internacionais') {
+      if (cleanedQuery.isEmpty) {
+        final symbols = tipo == 'Stock'
+            ? _defaultUsStocks
+            : tipo == 'Reit'
+                ? _defaultUsReits
+                : _defaultUsEtfs;
+        return _searchYahooDefaults(
+          symbols: symbols,
+          region: 'US',
+          lang: 'en-US',
+          tipo: tipo,
+        );
+      }
       return _searchYahooAssets(
-        query: query,
+        query: cleanedQuery,
         region: 'US',
         lang: 'en-US',
         tipo: tipo,
       );
     }
 
-    return _searchYahooAssets(
-      query: query,
-      region: 'BR',
-      lang: 'pt-BR',
-      tipo: tipo,
-    );
+    if (tipo == 'Tesouro Direto') {
+      return _searchTesouroAssets(query: cleanedQuery);
+    }
+
+    return _searchBrapiAssets(tipo: tipo, query: cleanedQuery);
   }
 
   Future<List<AssetOption>> _searchCryptoAssets({String query = ''}) async {
@@ -206,6 +325,212 @@ class ApiService {
     }
   }
 
+  Future<List<AssetOption>> _searchYahooDefaults({
+    required List<String> symbols,
+    required String region,
+    required String lang,
+    required String tipo,
+  }) async {
+    final futures = symbols
+        .map((symbol) => _searchYahooAssets(
+              query: symbol,
+              region: region,
+              lang: lang,
+              tipo: tipo,
+            ))
+        .toList();
+
+    final lists = await Future.wait(futures);
+    final options = <AssetOption>[];
+
+    for (var i = 0; i < symbols.length; i++) {
+      final symbol = symbols[i].toUpperCase();
+      final list = lists[i];
+      AssetOption? match;
+      for (final item in list) {
+        if (item.symbol.toUpperCase() == symbol) {
+          match = item;
+          break;
+        }
+      }
+      match ??= list.isNotEmpty ? list.first : null;
+      if (match != null) {
+        options.add(match);
+      }
+    }
+
+    return options;
+  }
+
+  Future<List<AssetOption>> _searchBrapiAssets({
+    required String tipo,
+    String query = '',
+  }) async {
+    try {
+      final brapiType = _brapiTypeForTipo(tipo);
+      if (brapiType == null) {
+        return [];
+      }
+
+      final trimmed = query.trim();
+      final searchParam =
+          trimmed.isEmpty ? '' : '&search=${Uri.encodeComponent(trimmed)}';
+      final data = await _getJsonMap(
+        'https://brapi.dev/api/quote/list?type=$brapiType&limit=40$searchParam',
+      );
+
+      final stocks = (data['stocks'] as List<dynamic>? ?? [])
+          .map((item) => item as Map<String, dynamic>)
+          .where((item) => _matchesBrapiTipo(tipo, item))
+          .map((item) {
+            final symbol = (item['stock'] ?? '').toString().toUpperCase();
+            final rawName = (item['name'] ?? '').toString();
+            final name = _normalizeName(symbol, rawName);
+            final price = (item['close'] as num?)?.toDouble() ?? 0;
+            return AssetOption(
+              symbol: symbol,
+              name: name,
+              price: price,
+              currency: 'BRL',
+            );
+          })
+          .take(30)
+          .toList();
+
+      if (stocks.isNotEmpty || trimmed.isNotEmpty) {
+        return stocks;
+      }
+
+      return _defaultAssetsForTipo(tipo);
+    } catch (_) {
+      return _defaultAssetsForTipo(tipo);
+    }
+  }
+
+  Future<List<AssetOption>> _searchTesouroAssets({String query = ''}) async {
+    final items = const [
+      'Tesouro Selic 2029',
+      'Tesouro IPCA+ 2035',
+      'Tesouro Prefixado 2029',
+      'Tesouro IPCA+ com Juros Semestrais 2045',
+    ];
+
+    final q = query.trim().toLowerCase();
+    final filtered = items.where((item) => q.isEmpty || item.toLowerCase().contains(q));
+
+    return filtered
+        .map(
+          (name) => AssetOption(
+            symbol: name,
+            name: name,
+            price: 0,
+            currency: 'BRL',
+          ),
+        )
+        .toList();
+  }
+
+  List<AssetOption> _defaultAssetsForTipo(String tipo) {
+    List<String> symbols;
+    String currency = 'BRL';
+
+    switch (tipo) {
+      case 'Ações':
+        symbols = _defaultBrStocks;
+        break;
+      case 'FIIs':
+      case 'Fundos de Investimentos':
+        symbols = _defaultBrFiis;
+        break;
+      case 'ETF':
+        symbols = _knownBrEtfs.toList();
+        break;
+      case 'BDRs':
+        symbols = _defaultBrBdrs;
+        break;
+      case 'Stock':
+        symbols = _defaultUsStocks;
+        currency = 'USD';
+        break;
+      case 'Reit':
+        symbols = _defaultUsReits;
+        currency = 'USD';
+        break;
+      case 'ETFs Internacionais':
+        symbols = _defaultUsEtfs;
+        currency = 'USD';
+        break;
+      default:
+        symbols = [];
+        break;
+    }
+
+    return symbols
+        .map(
+          (symbol) => AssetOption(
+            symbol: symbol,
+            name: _normalizeName(symbol, symbol),
+            price: 0,
+            currency: currency,
+          ),
+        )
+        .toList();
+  }
+
+  String? _brapiTypeForTipo(String tipo) {
+    switch (tipo) {
+      case 'Ações':
+        return 'stock';
+      case 'FIIs':
+      case 'Fundos de Investimentos':
+      case 'ETF':
+        return 'fund';
+      case 'BDRs':
+        return 'bdr';
+      default:
+        return 'stock';
+    }
+  }
+
+  bool _matchesBrapiTipo(String tipo, Map<String, dynamic> item) {
+    final type = (item['type'] ?? '').toString().toLowerCase();
+    final symbol = (item['stock'] ?? '').toString().toUpperCase();
+    final name = (item['name'] ?? '').toString().toUpperCase();
+
+    switch (tipo) {
+      case 'Ações':
+        return type == 'stock' && !symbol.endsWith('F');
+      case 'FIIs':
+      case 'Fundos de Investimentos':
+        return type == 'fund' && _isLikelyFii(symbol, name);
+      case 'ETF':
+        return type == 'fund' && _isLikelyEtf(symbol, name);
+      case 'BDRs':
+        return type == 'bdr' || symbol.endsWith('34');
+      default:
+        return true;
+    }
+  }
+
+  bool _isLikelyEtf(String symbol, String name) {
+    if (_knownBrEtfs.contains(symbol)) return true;
+    return name.contains('ETF') || name.contains('INDEX');
+  }
+
+  bool _isLikelyFii(String symbol, String name) {
+    if (!symbol.endsWith('11')) return false;
+    if (_isLikelyEtf(symbol, name)) return false;
+    return true;
+  }
+
+  String _normalizeName(String symbol, String rawName) {
+    final cleaned = rawName.trim();
+    if (cleaned.isEmpty || cleaned.toUpperCase() == symbol.toUpperCase()) {
+      return _fallbackNames[symbol.toUpperCase()] ?? symbol;
+    }
+    return cleaned;
+  }
+
   Future<List<MarketTicker>> getTopEtfs() {
     return _getTopBySymbols([
       'BOVA11',
@@ -269,6 +594,7 @@ class ApiService {
         final map = item as Map<String, dynamic>;
         return MarketTicker(
           symbol: map['symbol']?.toString() ?? '-',
+          name: map['shortName']?.toString() ?? map['longName']?.toString(),
           price: (map['regularMarketPrice'] as num?)?.toDouble() ?? 0,
           changePercent:
               (map['regularMarketChangePercent'] as num?)?.toDouble() ?? 0,
@@ -278,7 +604,48 @@ class ApiService {
       items.sort((a, b) => b.changePercent.compareTo(a.changePercent));
       return items.take(10).toList();
     } catch (_) {
-      return [];
+      return _getTopBySymbolsFallback(symbols);
+    }
+  }
+
+  Future<List<MarketTicker>> _getTopBySymbolsFallback(List<String> symbols) async {
+    final futures = symbols.map(_getBrapiListQuote).toList();
+    final results = await Future.wait(futures);
+    final items = results.whereType<MarketTicker>().toList();
+    items.sort((a, b) => b.changePercent.compareTo(a.changePercent));
+    return items.take(10).toList();
+  }
+
+  Future<MarketTicker?> _getBrapiListQuote(String symbol) async {
+    try {
+      final data = await _getJsonMap(
+        'https://brapi.dev/api/quote/list?search=${Uri.encodeComponent(symbol)}',
+      );
+      final stocks = (data['stocks'] as List<dynamic>? ?? [])
+          .map((item) => item as Map<String, dynamic>)
+          .toList();
+      final match = stocks.firstWhere(
+        (item) => (item['stock'] ?? '').toString().toUpperCase() == symbol.toUpperCase(),
+        orElse: () => {},
+      );
+      if (match.isEmpty) return null;
+
+      final close = (match['close'] as num?)?.toDouble() ?? 0;
+      final change = (match['change'] as num?)?.toDouble() ?? 0;
+      final previous = close - change;
+      final changePercent =
+          previous != 0 ? (change / previous) * 100 : 0;
+      final rawName = (match['name'] ?? '').toString();
+      final normalizedName = _normalizeName(symbol, rawName);
+
+      return MarketTicker(
+        symbol: symbol.toUpperCase(),
+        name: normalizedName,
+        price: close,
+        changePercent: changePercent,
+      );
+    } catch (_) {
+      return null;
     }
   }
 }
