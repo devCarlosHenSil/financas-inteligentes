@@ -132,7 +132,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: editTipo,
+                      initialValue: editTipo,
                       decoration: const InputDecoration(labelText: 'Tipo'),
                       items: const [
                         DropdownMenuItem(value: 'entrada', child: Text('Entrada')),
@@ -148,7 +148,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: editCategoria.isEmpty ? null : editCategoria,
+                      initialValue: editCategoria.isEmpty ? null : editCategoria,
                       decoration: const InputDecoration(labelText: 'Categoria'),
                       items: categorias
                           .map(
@@ -336,7 +336,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: categoria.isEmpty ? null : categoria,
+            initialValue: categoria.isEmpty ? null : categoria,
             decoration: const InputDecoration(labelText: 'Categoria'),
             items: _categoriasAtuais
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
