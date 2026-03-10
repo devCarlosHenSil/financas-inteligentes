@@ -430,6 +430,13 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _localizando
+                          ? 'Detectando sua cidade...'
+                          : 'Cidade atual para promoções: $_cidadeSelecionada',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 340,
@@ -465,6 +472,7 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String>(
+                                    key: ValueKey('cidade-$_cidadeSelecionada'),
                                     initialValue: _cidadeSelecionada,
                                     decoration: const InputDecoration(
                                       labelText: 'Cidade para promoções próximas',
