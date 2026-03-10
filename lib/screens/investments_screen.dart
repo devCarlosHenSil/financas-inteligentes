@@ -1923,7 +1923,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     : _rentabilidadeLineChart(
                         rentSeries,
                         cdiSeries,
-                        labels: seriesEntries.map((e) => e.data).toList(),
+                        labels: seriesEntries.map<DateTime>((e) => e.data).toList(),
                       ),
               ),
             ],
