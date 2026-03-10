@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:financas_inteligentes/models/investment_model.dart';
+import 'package:financas_inteligentes/models/provento_model.dart';
+import 'package:financas_inteligentes/models/rentabilidade_model.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -46,8 +48,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   String _patrimonioConsolidacao = 'Tipo de ativos';
   String _patrimonioAcoes = 'Consolidado';
   String _patrimonioFiis = 'Consolidado';
-  String _patrimonioRendaFixa = 'Consolidado';
-  String _rentabilidadeRange = 'Desde o início';
+  final String _rentabilidadeRange = 'Desde o início';
   bool _showIdealConsolidacao = false;
   bool _showIdealAcoes = false;
   bool _showIdealFiis = false;
@@ -735,7 +736,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
       padding: padding,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: child,
@@ -745,12 +746,12 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   Widget _filterPill(String label, {IconData? leading}) {
     return InkWell(
       onTap: () {},
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Row(
@@ -808,10 +809,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
       onSelectionChanged: (value) => onChanged(value.first),
       style: ButtonStyle(
         visualDensity: VisualDensity.compact,
-        padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-        side: MaterialStateProperty.all(const BorderSide(color: Color(0xFFE2E8F0))),
-        backgroundColor: MaterialStateProperty.resolveWith(
-          (states) => states.contains(MaterialState.selected) ? const Color(0xFFF1F5F9) : Colors.white,
+        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+        side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFE2E8F0))),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected) ? const Color(0xFFF1F5F9) : Colors.white,
         ),
       ),
     );
@@ -867,6 +868,21 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     const SizedBox(width: 8),
                     Text(_currency.format(entry.amount), style: const TextStyle(fontSize: 12)),
                   ],
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 80,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        height: 10,
+                        width: 80 * (entry.amount / total),
+                        decoration: BoxDecoration(
+                          color: entry.color,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
@@ -917,8 +933,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 width: 18,
                 borderRadius: BorderRadius.circular(4),
                 rodStackItems: [
-                  BarChartRodStackItem(0, received[index], const Color(0xFF4F6FE5)),
-                  BarChartRodStackItem(received[index], received[index] + pending[index], const Color(0xFFCBD5F5)),
+                  BarChartRodStackItem(0, received[index], const Color(0xFF4C6FFF)),
+                  BarChartRodStackItem(received[index], received[index] + pending[index], const Color(0xFFC7D2FE)),
                 ],
               ),
             ],
@@ -977,11 +993,17 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     );
   }
 
-  Widget _rentabilidadeLineChart(List<double> rentabilidade, List<double> cdi) {
-    final maxValue = [...rentabilidade, ...cdi].fold<double>(0, (max, value) => value > max ? value : max);
+  Widget _rentabilidadeLineChart(List<double> rentabilidade, List<double> cdi, {List<DateTime>? labels}) {
+    final values = [...rentabilidade, ...cdi];
+    final maxValue = values.fold<double>(0, (max, value) => value > max ? value : max);
+    final minValue = values.fold<double>(0, (min, value) => value < min ? value : min);
+    final labelDates = labels ?? List.generate(rentabilidade.length, (i) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month - (rentabilidade.length - 1 - i), 1);
+    });
     return LineChart(
       LineChartData(
-        minY: 0,
+        minY: minValue < 0 ? minValue * 1.2 : 0,
         maxY: maxValue <= 0 ? 10 : maxValue * 1.2,
         gridData: const FlGridData(drawVerticalLine: false),
         borderData: FlBorderData(show: false),
@@ -994,9 +1016,9 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               showTitles: true,
               getTitlesWidget: (value, meta) {
                 final idx = value.toInt();
-                if (idx < 0 || idx >= rentabilidade.length) return const SizedBox.shrink();
-                final month = idx + 1;
-                final label = month % 2 == 1 ? '${month.toString().padLeft(2, '0')}/25' : '';
+                if (idx < 0 || idx >= labelDates.length) return const SizedBox.shrink();
+                final date = labelDates[idx];
+                final label = DateFormat('MM/yy').format(date);
                 return Text(label, style: const TextStyle(fontSize: 10));
               },
             ),
@@ -1006,10 +1028,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           LineChartBarData(
             spots: List.generate(rentabilidade.length, (index) => FlSpot(index.toDouble(), rentabilidade[index])),
             isCurved: true,
-            color: const Color(0xFF4F6FE5),
+            color: const Color(0xFF4C6FFF),
             barWidth: 2.2,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: const Color(0xFF4F6FE5).withOpacity(0.08)),
+            belowBarData: BarAreaData(show: true, color: const Color(0x144C6FFF)),
           ),
           LineChartBarData(
             spots: List.generate(cdi.length, (index) => FlSpot(index.toDouble(), cdi[index])),
@@ -1211,88 +1233,67 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _buildProventosTab() {
-    final labels = <String>[
-      '03/25',
-      '04/25',
-      '05/25',
-      '06/25',
-      '07/25',
-      '08/25',
-      '09/25',
-      '10/25',
-      '11/25',
-      '12/25',
-      '01/26',
-      '02/26',
-      '03/26',
-    ];
-    final received = <double>[8.2, 2.6, 3.8, 3.1, 2.6, 5.7, 2.4, 2.4, 2.6, 7.0, 2.3, 2.6, 3.8];
-    final pending = <double>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.1];
-    final distribution = <_LegendEntry>[
-      const _LegendEntry(label: 'VGIR11', amount: 13.19, color: Color(0xFF4F6FE5)),
-      const _LegendEntry(label: 'GARE11', amount: 11.78, color: Color(0xFF38BDF8)),
-      const _LegendEntry(label: 'VGHF11', amount: 11.68, color: Color(0xFF5EEAD4)),
-      const _LegendEntry(label: 'BTCI11', amount: 9.52, color: Color(0xFFFACC15)),
-      const _LegendEntry(label: 'XPCA11', amount: 8.32, color: Color(0xFFFB7185)),
-    ];
+    return StreamBuilder<List<ProventoModel>>(
+      stream: _service.getProventos(),
+      builder: (context, snapshot) {
+        final proventos = snapshot.data ?? [];
+        final now = DateTime.now();
+        final months = List.generate(
+          13,
+          (i) => DateTime(now.year, now.month - 12 + i, 1),
+        );
+        final currentYearLabel = DateFormat('yyyy').format(now);
+        final labels = months.map((m) => DateFormat('MM/yy').format(m)).toList();
+        final received = List<double>.filled(months.length, 0);
+        final pending = List<double>.filled(months.length, 0);
+        final last12Start = DateTime(now.year, now.month - 11, 1);
 
-    final historicoMensal = <List<String>>[
-      ['2026', '2,37', '2,68', '3,77', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '2,94', '8,83'],
-      ['2025', '2,02', '2,53', '8,26', '2,72', '3,88', '3,10', '2,64', '5,75', '2,43', '2,44', '2,72', '7,12', '3,80', '45,60'],
-      ['2024', '2,51', '4,89', '4,17', '2,28', '2,85', '3,51', '3,69', '5,80', '2,57', '2,21', '2,55', '3,20', '3,35', '40,23'],
-      ['2023', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '0,00', '1,73', '0,14', '1,73'],
-    ];
+        double total12m = 0;
+        double totalCarteira = 0;
+        final distributionMap = <String, double>{};
 
-    final proventosRows = <_ProventoRow>[
-      const _ProventoRow(
-        ativo: 'BBSE3',
-        tipoAtivo: 'Ações',
-        status: 'Pago',
-        tipoPagamento: 'Dividendos',
-        dataCom: '12/02/2026',
-        dataPagamento: '02/03/2026',
-        quantidade: '1,00',
-        valorDiv: 'R\$ 2,55',
-        valorTotal: 'R\$ 2,55',
-      ),
-      const _ProventoRow(
-        ativo: 'BBSE3',
-        tipoAtivo: 'Ações',
-        status: 'Pago',
-        tipoPagamento: 'Rend. Trib.',
-        dataCom: '12/02/2026',
-        dataPagamento: '02/03/2026',
-        quantidade: '1,00',
-        valorDiv: 'R\$ 0,06',
-        valorTotal: 'R\$ 0,06',
-      ),
-      const _ProventoRow(
-        ativo: 'KLBN3',
-        tipoAtivo: 'Ações',
-        status: 'Pago',
-        tipoPagamento: 'Dividendos',
-        dataCom: '15/12/2025',
-        dataPagamento: '27/02/2026',
-        quantidade: '8,00',
-        valorDiv: 'R\$ 0,05',
-        valorTotal: 'R\$ 0,36',
-      ),
-      const _ProventoRow(
-        ativo: 'VGIR11',
-        tipoAtivo: 'FIIs',
-        status: 'Pago',
-        tipoPagamento: 'Dividendos',
-        dataCom: '11/02/2026',
-        dataPagamento: '20/02/2026',
-        quantidade: '4,00',
-        valorDiv: 'R\$ 0,13',
-        valorTotal: 'R\$ 0,52',
-      ),
-    ];
+        for (final p in proventos) {
+          final isPaid = p.status.toLowerCase().contains('pago');
+          final dateRef = p.dataPagamento;
+          totalCarteira += p.valorTotal;
+          if (isPaid && dateRef.isAfter(last12Start.subtract(const Duration(days: 1)))) {
+            total12m += p.valorTotal;
+            distributionMap.update(p.ativo, (v) => v + p.valorTotal, ifAbsent: () => p.valorTotal);
+          }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 1100;
+          final idx = months.indexWhere((m) => m.year == dateRef.year && m.month == dateRef.month);
+          if (idx >= 0) {
+            if (isPaid) {
+              received[idx] += p.valorTotal;
+            } else {
+              pending[idx] += p.valorTotal;
+            }
+          }
+        }
+
+        final mediaMensal = total12m / 12;
+        final distEntries = distributionMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+        final distribution = distEntries.asMap().entries.take(5).map((entry) {
+          final idx = entry.key;
+          final item = entry.value;
+          final hue = (idx * 360 / (distEntries.isEmpty ? 1 : distEntries.length)) % 360;
+          return _LegendEntry(
+            label: item.key,
+            amount: item.value,
+            color: HSVColor.fromAHSV(1, hue, 0.65, 0.85).toColor(),
+          );
+        }).toList();
+
+        final historicoMap = <int, List<double>>{};
+        for (final p in proventos.where((p) => p.status.toLowerCase().contains('pago'))) {
+          historicoMap.putIfAbsent(p.dataPagamento.year, () => List<double>.filled(12, 0));
+          historicoMap[p.dataPagamento.year]![p.dataPagamento.month - 1] += p.valorTotal;
+        }
+        final proventosSorted = [...proventos]..sort((a, b) => b.dataPagamento.compareTo(a.dataPagamento));
+        final historicoRows = historicoMap.entries.toList()
+          ..sort((a, b) => b.key.compareTo(a.key));
+
+        final isNarrow = MediaQuery.of(context).size.width < 1100;
         final summaryCard = _sectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1303,9 +1304,9 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Text('R\$ 3,82', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                  Text(_currency.format(mediaMensal), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
                   const SizedBox(width: 6),
-                  Text(' / Criar meta', style: TextStyle(color: Colors.blueGrey.shade400, fontSize: 12)),
+                  const Text('/ Criar meta', style: TextStyle(color: Color(0xFF4C6FFF), fontSize: 12)),
                   const Spacer(),
                   const Text('0%', style: TextStyle(fontWeight: FontWeight.w700)),
                 ],
@@ -1327,17 +1328,22 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text('R\$ 45,81', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(_currency.format(total12m), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               const Divider(),
               const Text('Total da carteira', style: TextStyle(color: Color(0xFF64748B))),
               const SizedBox(height: 6),
-              const Text('R\$ 96,38', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(_currency.format(totalCarteira), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               const Divider(),
               const Text('Distribuição de proventos em 12 meses', style: TextStyle(color: Color(0xFF64748B))),
               const SizedBox(height: 12),
-              SizedBox(height: 160, child: _donutChartWithLegend(distribution, showAmount: false)),
+              SizedBox(
+                height: 160,
+                child: distribution.isEmpty
+                    ? const Center(child: Text('Sem proventos no período.'))
+                    : _donutChartWithLegend(distribution, showAmount: false),
+              ),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(onPressed: () {}, child: const Text('Ver todos')),
@@ -1374,13 +1380,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               const SizedBox(height: 16),
               Row(
                 children: const [
-                  _LegendDot(color: Color(0xFF4F6FE5), label: 'Proventos recebidos'),
+                  _LegendDot(color: Color(0xFF4C6FFF), label: 'Proventos recebidos'),
                   SizedBox(width: 12),
-                  _LegendDot(color: Color(0xFFCBD5F5), label: 'Proventos a receber'),
+                  _LegendDot(color: Color(0xFFC7D2FE), label: 'Proventos a receber'),
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(height: 240, child: _proventosBarChart(labels, received, pending)),
+              SizedBox(
+                height: 240,
+                child: received.every((v) => v == 0) && pending.every((v) => v == 0)
+                    ? const Center(child: Text('Sem proventos no período.'))
+                    : _proventosBarChart(labels, received, pending),
+              ),
             ],
           ),
         );
@@ -1413,7 +1424,11 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       children: [
                         const Text('Histórico mensal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                         const Spacer(),
-                        _pill('Total  R\$ 96,38', background: const Color(0xFFE0F2FE), textColor: const Color(0xFF0284C7)),
+                        _pill(
+                          'Total  ${_currency.format(total12m)}',
+                          background: const Color(0xFFE0F2FE),
+                          textColor: const Color(0xFF0284C7),
+                        ),
                         const SizedBox(width: 10),
                         _filterPill('Recebidos', leading: Icons.calendar_month_outlined),
                         const SizedBox(width: 8),
@@ -1425,28 +1440,43 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Ano')),
-                          DataColumn(label: Text('Jan')),
-                          DataColumn(label: Text('Fev')),
-                          DataColumn(label: Text('Mar')),
-                          DataColumn(label: Text('Abr')),
-                          DataColumn(label: Text('Mai')),
-                          DataColumn(label: Text('Jun')),
-                          DataColumn(label: Text('Jul')),
-                          DataColumn(label: Text('Ago')),
-                          DataColumn(label: Text('Set')),
-                          DataColumn(label: Text('Out')),
-                          DataColumn(label: Text('Nov')),
-                          DataColumn(label: Text('Dez')),
-                          DataColumn(label: Text('Média')),
-                          DataColumn(label: Text('Total')),
-                        ],
-                        rows: historicoMensal
-                            .map((row) => DataRow(cells: row.map((cell) => DataCell(Text(cell))).toList()))
-                            .toList(),
-                      ),
+                      child: historicoRows.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('Sem proventos cadastrados.'),
+                            )
+                          : DataTable(
+                              columns: const [
+                                DataColumn(label: Text('Ano')),
+                                DataColumn(label: Text('Jan')),
+                                DataColumn(label: Text('Fev')),
+                                DataColumn(label: Text('Mar')),
+                                DataColumn(label: Text('Abr')),
+                                DataColumn(label: Text('Mai')),
+                                DataColumn(label: Text('Jun')),
+                                DataColumn(label: Text('Jul')),
+                                DataColumn(label: Text('Ago')),
+                                DataColumn(label: Text('Set')),
+                                DataColumn(label: Text('Out')),
+                                DataColumn(label: Text('Nov')),
+                                DataColumn(label: Text('Dez')),
+                                DataColumn(label: Text('Média')),
+                                DataColumn(label: Text('Total')),
+                              ],
+                              rows: historicoRows.map((entry) {
+                                final year = entry.key;
+                                final monthsValues = entry.value;
+                                final total = monthsValues.fold<double>(0, (s, v) => s + v);
+                                final media = total / 12;
+                                final cells = [
+                                  year.toString(),
+                                  ...monthsValues.map((v) => _formatDecimalValue(v, 2)),
+                                  _formatDecimalValue(media, 2),
+                                  _formatDecimalValue(total, 2),
+                                ];
+                                return DataRow(cells: cells.map((cell) => DataCell(Text(cell))).toList());
+                              }).toList(),
+                            ),
                     ),
                   ],
                 ),
@@ -1460,9 +1490,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       children: [
                         const Text('Meus proventos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                         const Spacer(),
-                        _pill('Total  R\$ 11,64', background: const Color(0xFFE0F2FE), textColor: const Color(0xFF0284C7)),
+                        _pill(
+                          'Total  ${_currency.format(totalCarteira)}',
+                          background: const Color(0xFFE0F2FE),
+                          textColor: const Color(0xFF0284C7),
+                        ),
                         const SizedBox(width: 10),
-                        _filterPill('2026', leading: Icons.calendar_month_outlined),
+                        _filterPill(currentYearLabel, leading: Icons.calendar_month_outlined),
                         const SizedBox(width: 8),
                         _filterPill('Tipo de ativo', leading: Icons.tune),
                         const SizedBox(width: 8),
@@ -1472,34 +1506,43 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Ativo')),
-                          DataColumn(label: Text('Tipo de ativo')),
-                          DataColumn(label: Text('Status do pagamento')),
-                          DataColumn(label: Text('Tipo de pagamento')),
-                          DataColumn(label: Text('Data Com')),
-                          DataColumn(label: Text('Data Pagamento')),
-                          DataColumn(label: Text('Quantidade')),
-                          DataColumn(label: Text('Valor do div.')),
-                          DataColumn(label: Text('Valor total')),
-                        ],
-                        rows: proventosRows.map((row) {
-                          final statusColor = row.status == 'Pago' ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE);
-                          final statusText = row.status == 'Pago' ? const Color(0xFF16A34A) : const Color(0xFF0284C7);
-                          return DataRow(cells: [
-                            DataCell(Text(row.ativo)),
-                            DataCell(_pill(row.tipoAtivo, background: const Color(0xFFF1F5F9), textColor: const Color(0xFF475569))),
-                            DataCell(_pill(row.status, background: statusColor, textColor: statusText, icon: Icons.monetization_on_outlined)),
-                            DataCell(Text(row.tipoPagamento)),
-                            DataCell(Text(row.dataCom)),
-                            DataCell(Text(row.dataPagamento)),
-                            DataCell(Text(row.quantidade)),
-                            DataCell(Text(row.valorDiv)),
-                            DataCell(Text(row.valorTotal)),
-                          ]);
-                        }).toList(),
-                      ),
+                      child: proventosSorted.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('Sem proventos cadastrados.'),
+                            )
+                          : DataTable(
+                              columns: const [
+                                DataColumn(label: Text('Ativo')),
+                                DataColumn(label: Text('Tipo de ativo')),
+                                DataColumn(label: Text('Status do pagamento')),
+                                DataColumn(label: Text('Tipo de pagamento')),
+                                DataColumn(label: Text('Data Com')),
+                                DataColumn(label: Text('Data Pagamento')),
+                                DataColumn(label: Text('Quantidade')),
+                                DataColumn(label: Text('Valor do div.')),
+                                DataColumn(label: Text('Valor total')),
+                              ],
+                              rows: proventosSorted.map((row) {
+                                final statusColor = row.status.toLowerCase().contains('pago')
+                                    ? const Color(0xFFDCFCE7)
+                                    : const Color(0xFFE0F2FE);
+                                final statusText = row.status.toLowerCase().contains('pago')
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFF0284C7);
+                                return DataRow(cells: [
+                                  DataCell(Text(row.ativo)),
+                                  DataCell(_pill(row.tipoAtivo, background: const Color(0xFFF1F5F9), textColor: const Color(0xFF475569))),
+                                  DataCell(_pill(row.status, background: statusColor, textColor: statusText, icon: Icons.monetization_on_outlined)),
+                                  DataCell(Text(row.tipoPagamento)),
+                                  DataCell(Text(DateFormat('dd/MM/yyyy').format(row.dataCom))),
+                                  DataCell(Text(DateFormat('dd/MM/yyyy').format(row.dataPagamento))),
+                                  DataCell(Text(_formatDecimalValue(row.quantidade, 2))),
+                                  DataCell(Text(_currency.format(row.valorDiv))),
+                                  DataCell(Text(_currency.format(row.valorTotal))),
+                                ]);
+                              }).toList(),
+                            ),
                     ),
                   ],
                 ),
@@ -1710,75 +1753,96 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _buildRentabilidadeTab() {
-    final rentabilidade = <double>[
-      0.5,
-      2.2,
-      3.1,
-      4.6,
-      6.2,
-      7.4,
-      9.1,
-      11.4,
-      10.6,
-      12.2,
-      14.8,
-      15.4,
-      17.2,
-      18.1,
-      19.4,
-      20.2,
-      22.3,
-      24.1,
-      26.7,
-      28.9,
-      27.8,
-      29.4,
-    ];
-    final cdi = <double>[
-      0.6,
-      1.8,
-      2.6,
-      3.5,
-      4.2,
-      5.3,
-      6.1,
-      7.0,
-      7.8,
-      8.6,
-      9.5,
-      10.4,
-      11.3,
-      12.2,
-      13.1,
-      14.0,
-      15.1,
-      16.4,
-      17.6,
-      18.8,
-      19.7,
-      20.6,
-    ];
-    final tableRows = <List<String>>[
-      ['2026', '2,52%', '1,05%', '-0,97%', '-', '-', '-', '-', '-', '-', '-', '-', '-', '2,60%', '28,15%'],
-      ['2025', '1,50%', '-0,31%', '3,03%', '1,90%', '-0,45%', '1,20%', '-0,99%', '1,59%', '1,15%', '1,13%', '0,14%', '4,66%', '15,43%', '24,91%'],
-      ['2024', '-0,38%', '1,90%', '1,34%', '-0,67%', '1,02%', '1,20%', '1,60%', '2,67%', '-1,13%', '-1,18%', '-0,45%', '0,37%', '6,39%', '8,21%'],
-      ['2023', '-', '-', '-', '-', '-', '-', '-', '-', '-', '0,00%', '1,72%', '-', '1,72%', '1,72%'],
-    ];
+    return StreamBuilder<List<RentabilidadeModel>>(
+      stream: _service.getRentabilidade(),
+      builder: (context, snapshot) {
+        final entries = [...(snapshot.data ?? [])];
+        entries.sort((a, b) => a.data.compareTo(b.data));
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isNarrow = constraints.maxWidth < 1100;
+        double compoundPercent(Iterable<double> values) {
+          var acc = 1.0;
+          for (final v in values) {
+            acc *= 1 + (v / 100);
+          }
+          return (acc - 1) * 100;
+        }
+
+        String pct(double value) => '${value.toStringAsFixed(2).replaceAll('.', ',')}%';
+
+        final now = DateTime.now();
+        final last12Start = DateTime(now.year, now.month - 11, 1);
+        final last12 = entries.where((e) => e.data.isAfter(last12Start.subtract(const Duration(days: 1)))).toList();
+        final totalReturn = entries.isEmpty ? 0.0 : compoundPercent(entries.map((e) => e.rentabilidade));
+        final totalCdi = entries.isEmpty ? 0.0 : compoundPercent(entries.map((e) => e.cdi));
+        final last12Return = last12.isEmpty ? 0.0 : compoundPercent(last12.map((e) => e.rentabilidade));
+        final last12Cdi = last12.isEmpty ? 0.0 : compoundPercent(last12.map((e) => e.cdi));
+        final lastMonth = entries.isNotEmpty ? entries.last : null;
+
+        final seriesEntries = entries.length > 24 ? entries.sublist(entries.length - 24) : entries;
+        final rentSeries = <double>[];
+        final cdiSeries = <double>[];
+        var rentAcc = 1.0;
+        var cdiAcc = 1.0;
+        for (final entry in seriesEntries) {
+          rentAcc *= 1 + (entry.rentabilidade / 100);
+          cdiAcc *= 1 + (entry.cdi / 100);
+          rentSeries.add((rentAcc - 1) * 100);
+          cdiSeries.add((cdiAcc - 1) * 100);
+        }
+
+        final byYear = <int, List<RentabilidadeModel?>>{};
+        for (final entry in entries) {
+          byYear.putIfAbsent(entry.data.year, () => List<RentabilidadeModel?>.filled(12, null));
+          byYear[entry.data.year]![entry.data.month - 1] = entry;
+        }
+        final years = byYear.keys.toList()..sort((a, b) => b.compareTo(a));
+
+        final tableRows = <List<String>>[];
+        double acumulado = 1.0;
+        final yearsAsc = years.toList()..sort();
+        final acumuladoByYear = <int, double>{};
+        for (final year in yearsAsc) {
+          final months = byYear[year] ?? List<RentabilidadeModel?>.filled(12, null);
+          final yearReturn = compoundPercent(months.whereType<RentabilidadeModel>().map((e) => e.rentabilidade));
+          acumulado *= 1 + (yearReturn / 100);
+          acumuladoByYear[year] = (acumulado - 1) * 100;
+        }
+        for (final year in years) {
+          final months = byYear[year] ?? List<RentabilidadeModel?>.filled(12, null);
+          final monthValues = months
+              .map((entry) => entry == null ? '-' : pct(entry.rentabilidade))
+              .toList();
+          final yearReturn = compoundPercent(months.whereType<RentabilidadeModel>().map((e) => e.rentabilidade));
+          tableRows.add([
+            year.toString(),
+            ...monthValues,
+            pct(yearReturn),
+            pct(acumuladoByYear[year] ?? 0),
+          ]);
+        }
+
+        final isNarrow = MediaQuery.of(context).size.width < 1100;
+        final totalColor = totalReturn >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+        final last12Color = last12Return >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+        final lastMonthColor = (lastMonth?.rentabilidade ?? 0) >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+
         final kpiCards = Column(
           children: [
             _sectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
-                  SizedBox(height: 8),
-                  Text('28,15%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
-                  SizedBox(height: 8),
-                  Text('11,87% abaixo do CDI', style: TextStyle(color: Color(0xFF64748B))),
+                children: [
+                  const Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    pct(totalReturn),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: totalColor),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${(totalReturn - totalCdi).toStringAsFixed(2).replaceAll('.', ',')}% ${totalReturn >= totalCdi ? 'acima' : 'abaixo'} do CDI',
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ),
@@ -1786,12 +1850,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             _sectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Últimos 12 meses', style: TextStyle(fontWeight: FontWeight.w700)),
-                  SizedBox(height: 8),
-                  Text('17,03%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
-                  SizedBox(height: 8),
-                  Text('16,9% acima do CDI', style: TextStyle(color: Color(0xFF64748B))),
+                children: [
+                  const Text('Últimos 12 meses', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    pct(last12Return),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: last12Color),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${(last12Return - last12Cdi).toStringAsFixed(2).replaceAll('.', ',')}% ${last12Return >= last12Cdi ? 'acima' : 'abaixo'} do CDI',
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ),
@@ -1799,12 +1869,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             _sectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Último mês', style: TextStyle(fontWeight: FontWeight.w700)),
-                  SizedBox(height: 8),
-                  Text('0,07%', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
-                  SizedBox(height: 8),
-                  Text('93,41% abaixo do CDI', style: TextStyle(color: Color(0xFF64748B))),
+                children: [
+                  const Text('Último mês', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    pct(lastMonth?.rentabilidade ?? 0),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: lastMonthColor),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${((lastMonth?.rentabilidade ?? 0) - (lastMonth?.cdi ?? 0)).toStringAsFixed(2).replaceAll('.', ',')}% ${(lastMonth?.rentabilidade ?? 0) >= (lastMonth?.cdi ?? 0) ? 'acima' : 'abaixo'} do CDI',
+                    style: const TextStyle(color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ),
@@ -1829,7 +1905,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 spacing: 12,
                 runSpacing: 6,
                 children: const [
-                  _LegendDot(color: Color(0xFF4F6FE5), label: 'Rentabilidade'),
+                  _LegendDot(color: Color(0xFF4C6FFF), label: 'Rentabilidade'),
                   _LegendDot(color: Color(0xFFF59E0B), label: 'CDI'),
                   _LegendDot(color: Color(0xFF94A3B8), label: 'IPCA'),
                   _LegendDot(color: Color(0xFF94A3B8), label: 'IFIX'),
@@ -1840,7 +1916,16 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(height: 260, child: _rentabilidadeLineChart(rentabilidade, cdi)),
+              SizedBox(
+                height: 260,
+                child: rentSeries.isEmpty
+                    ? const Center(child: Text('Sem dados de rentabilidade.'))
+                    : _rentabilidadeLineChart(
+                        rentSeries,
+                        cdiSeries,
+                        labels: seriesEntries.map((e) => e.data).toList(),
+                      ),
+              ),
             ],
           ),
         );
@@ -1873,28 +1958,33 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Ano')),
-                          DataColumn(label: Text('Jan')),
-                          DataColumn(label: Text('Fev')),
-                          DataColumn(label: Text('Mar')),
-                          DataColumn(label: Text('Abr')),
-                          DataColumn(label: Text('Mai')),
-                          DataColumn(label: Text('Jun')),
-                          DataColumn(label: Text('Jul')),
-                          DataColumn(label: Text('Ago')),
-                          DataColumn(label: Text('Set')),
-                          DataColumn(label: Text('Out')),
-                          DataColumn(label: Text('Nov')),
-                          DataColumn(label: Text('Dez')),
-                          DataColumn(label: Text('Ano')),
-                          DataColumn(label: Text('Acumulado')),
-                        ],
-                        rows: tableRows
-                            .map((row) => DataRow(cells: row.map((cell) => DataCell(Text(cell))).toList()))
-                            .toList(),
-                      ),
+                      child: tableRows.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text('Sem dados de rentabilidade.'),
+                            )
+                          : DataTable(
+                              columns: const [
+                                DataColumn(label: Text('Ano')),
+                                DataColumn(label: Text('Jan')),
+                                DataColumn(label: Text('Fev')),
+                                DataColumn(label: Text('Mar')),
+                                DataColumn(label: Text('Abr')),
+                                DataColumn(label: Text('Mai')),
+                                DataColumn(label: Text('Jun')),
+                                DataColumn(label: Text('Jul')),
+                                DataColumn(label: Text('Ago')),
+                                DataColumn(label: Text('Set')),
+                                DataColumn(label: Text('Out')),
+                                DataColumn(label: Text('Nov')),
+                                DataColumn(label: Text('Dez')),
+                                DataColumn(label: Text('Ano')),
+                                DataColumn(label: Text('Acumulado')),
+                              ],
+                              rows: tableRows
+                                  .map((row) => DataRow(cells: row.map((cell) => DataCell(Text(cell))).toList()))
+                                  .toList(),
+                            ),
                     ),
                   ],
                 ),
@@ -1955,6 +2045,9 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       labelColor: const Color(0xFF0F172A),
                       unselectedLabelColor: const Color(0xFF64748B),
                       indicatorColor: const Color(0xFF0F172A),
+                      indicatorWeight: 2,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: const Color(0xFFE2E8F0),
                       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                       tabs: const [
                         Tab(text: 'Resumo'),
@@ -2058,30 +2151,6 @@ class _LegendEntry {
   final String label;
   final double amount;
   final Color color;
-}
-
-class _ProventoRow {
-  const _ProventoRow({
-    required this.ativo,
-    required this.tipoAtivo,
-    required this.status,
-    required this.tipoPagamento,
-    required this.dataCom,
-    required this.dataPagamento,
-    required this.quantidade,
-    required this.valorDiv,
-    required this.valorTotal,
-  });
-
-  final String ativo;
-  final String tipoAtivo;
-  final String status;
-  final String tipoPagamento;
-  final String dataCom;
-  final String dataPagamento;
-  final String quantidade;
-  final String valorDiv;
-  final String valorTotal;
 }
 
 class _LegendDot extends StatelessWidget {

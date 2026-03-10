@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:financas_inteligentes/models/transaction_model.dart';
 import 'package:financas_inteligentes/models/investment_model.dart';
 import 'package:financas_inteligentes/models/shopping_item_model.dart';
+import 'package:financas_inteligentes/models/provento_model.dart';
+import 'package:financas_inteligentes/models/rentabilidade_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore db = FirebaseFirestore.instance;
@@ -62,6 +64,34 @@ class FirestoreService {
   Stream<List<InvestmentModel>> getInvestments() {
     return db.collection('usuarios/$userId/investimentos').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => InvestmentModel.fromMap(doc.data(), doc.id)).toList();
+    });
+  }
+
+  Future<void> addProvento(ProventoModel provento) async {
+    await db.collection('usuarios/$userId/proventos').add(provento.toMap());
+  }
+
+  Future<void> deleteProvento(String id) async {
+    await db.collection('usuarios/$userId/proventos').doc(id).delete();
+  }
+
+  Stream<List<ProventoModel>> getProventos() {
+    return db.collection('usuarios/$userId/proventos').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => ProventoModel.fromMap(doc.data(), doc.id)).toList();
+    });
+  }
+
+  Future<void> addRentabilidade(RentabilidadeModel rentabilidade) async {
+    await db.collection('usuarios/$userId/rentabilidade').add(rentabilidade.toMap());
+  }
+
+  Future<void> deleteRentabilidade(String id) async {
+    await db.collection('usuarios/$userId/rentabilidade').doc(id).delete();
+  }
+
+  Stream<List<RentabilidadeModel>> getRentabilidade() {
+    return db.collection('usuarios/$userId/rentabilidade').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => RentabilidadeModel.fromMap(doc.data(), doc.id)).toList();
     });
   }
 
