@@ -45,9 +45,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   void _listenTransactions() {
     _transactionsSubscription = _service.getTransactions().listen((transactions) {
       final now = DateTime.now();
-      final txMesAtual = transactions.where(
-        (t) => t.data.month == now.month && t.data.year == now.year,
-      );
+      final txMesAtual = transactions.where((t) => t.data.month == now.month && t.data.year == now.year);
 
       final Map<String, double> novasEntradasPorCategoria = {};
       final Map<String, double> novasSaidasPorCategoria = {};
@@ -58,18 +56,10 @@ class DashboardScreenState extends State<DashboardScreen> {
       for (final t in txMesAtual) {
         if (t.tipo == 'entrada') {
           novasEntradas += t.valor;
-          novasEntradasPorCategoria.update(
-            t.categoria,
-            (value) => value + t.valor,
-            ifAbsent: () => t.valor,
-          );
+          novasEntradasPorCategoria.update(t.categoria, (value) => value + t.valor, ifAbsent: () => t.valor);
         } else if (t.tipo == 'saida') {
           novasSaidas += t.valor;
-          novasSaidasPorCategoria.update(
-            t.categoria,
-            (value) => value + t.valor,
-            ifAbsent: () => t.valor,
-          );
+          novasSaidasPorCategoria.update(t.categoria, (value) => value + t.valor, ifAbsent: () => t.valor);
         }
 
         if (t.superfluo) {
@@ -97,18 +87,14 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   String getGastosAnalise() {
     if (totalSuperfluos > totalSaidas * 0.3) {
-      return 'Você gastou muito em itens supérfluos (${_currencyFormatter.format(totalSuperfluos)}) – considere poupar mais!';
+      return 'Você gastou muito em supérfluos (${_currencyFormatter.format(totalSuperfluos)}).';
     }
-
-    return 'Bons gastos! Supérfluos estão baixos (${_currencyFormatter.format(totalSuperfluos)}). Continue assim!';
+    return 'Bons gastos! Supérfluos baixos (${_currencyFormatter.format(totalSuperfluos)}).';
   }
 
   List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
-    final items = data.entries
-        .map((entry) => _CategoryTotal(nome: entry.key, valor: entry.value))
-        .toList()
+    return data.entries.map((entry) => _CategoryTotal(nome: entry.key, valor: entry.value)).toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
-    return items;
   }
 
   Color _categoryColor(String category, {required bool isIncome}) {
@@ -152,10 +138,10 @@ class DashboardScreenState extends State<DashboardScreen> {
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome),
         title: '${percent.toStringAsFixed(1)}%',
-        radius: isTouched ? 108 : 92,
+        radius: isTouched ? 100 : 84,
         titleStyle: TextStyle(
-          fontSize: isTouched ? 12 : 10,
-          fontWeight: FontWeight.w700,
+          fontSize: isTouched ? 11 : 9,
+          fontWeight: FontWeight.bold,
           color: Colors.white,
           shadows: const [Shadow(color: Colors.black54, blurRadius: 2)],
         ),
@@ -163,18 +149,53 @@ class DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Widget _buildHoveredInfo(List<_CategoryTotal> items, {required bool isIncome, required int touchedIndex}) {
+    if (touchedIndex < 0 || touchedIndex >= items.length) {
+      return Text(
+        'Passe o mouse sobre as fatias para destacar categoria.',
+        style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+    final item = items[touchedIndex];
+    final percent = total == 0 ? 0 : (item.valor / total) * 100;
+
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: _categoryColor(item.nome, isIncome: isIncome),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${item.nome} • ${percent.toStringAsFixed(1)}% • ${_currencyFormatter.format(item.valor)}',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLegend(List<_CategoryTotal> items, {required bool isIncome}) {
     final total = items.fold<double>(0, (sum, item) => sum + item.valor);
 
     return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 5.8,
-        mainAxisSpacing: 4,
+        childAspectRatio: 6.5,
         crossAxisSpacing: 10,
+        mainAxisSpacing: 4,
       ),
       itemBuilder: (context, index) {
         final item = items[index];
@@ -183,25 +204,25 @@ class DashboardScreenState extends State<DashboardScreen> {
         return Row(
           children: [
             Container(
-              width: 12,
-              height: 12,
+              width: 10,
+              height: 10,
               decoration: BoxDecoration(
                 color: _categoryColor(item.nome, isIncome: isIncome),
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 item.nome,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
             Text(
               '${percent.toStringAsFixed(1)}%',
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 12, fontWeight: FontWeight.w700),
             ),
           ],
         );
@@ -209,63 +230,27 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHoveredInfo(List<_CategoryTotal> items, {required bool isIncome, required int touchedIndex}) {
-    if (touchedIndex < 0 || touchedIndex >= items.length) {
-      return Text(
-        'Passe o mouse sobre uma fatia para destacar categoria',
-        style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-      );
-    }
-
-    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
-    final touched = items[touchedIndex];
-    final percent = total == 0 ? 0 : (touched.valor / total) * 100;
-
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: _categoryColor(touched.nome, isIncome: isIncome),
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            '${touched.nome} • ${percent.toStringAsFixed(1)}% • ${_currencyFormatter.format(touched.valor)}',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPieChart(
-    List<_CategoryTotal> items, {
-    required bool isIncome,
-    required int touchedIndex,
-  }) {
-    return SizedBox(
-      height: 320,
+  Widget _buildPieChart(List<_CategoryTotal> items, {required bool isIncome, required int touchedIndex}) {
+    return AspectRatio(
+      aspectRatio: 1.8,
       child: PieChart(
         PieChartData(
           sectionsSpace: 2,
-          centerSpaceRadius: 46,
+          centerSpaceRadius: 38,
           sections: _getPieSections(items, isIncome: isIncome, touchedIndex: touchedIndex),
           borderData: FlBorderData(show: false),
           pieTouchData: PieTouchData(
             enabled: true,
             touchCallback: (event, response) {
-              if (!mounted) return;
               final idx = response?.touchedSection?.touchedSectionIndex ?? -1;
-              if (isIncome) {
-                setState(() => _touchedIncomeIndex = idx);
-              } else {
-                setState(() => _touchedExpenseIndex = idx);
-              }
+              if (!mounted) return;
+              setState(() {
+                if (isIncome) {
+                  _touchedIncomeIndex = idx;
+                } else {
+                  _touchedExpenseIndex = idx;
+                }
+              });
             },
           ),
         ),
@@ -273,7 +258,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPieChartCard({
+  Widget _buildChartCard({
     required String title,
     required Map<String, double> data,
     required bool isIncome,
@@ -282,26 +267,22 @@ class DashboardScreenState extends State<DashboardScreen> {
     final touchedIndex = isIncome ? _touchedIncomeIndex : _touchedExpenseIndex;
 
     return Card(
-      elevation: 3,
-      shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             if (items.isEmpty)
-              const SizedBox(
-                height: 220,
-                child: Center(child: Text('Sem dados para o mês atual')),
-              )
+              const Expanded(child: Center(child: Text('Sem dados para o mês atual')))
             else ...[
-              _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex),
-              const SizedBox(height: 8),
+              Expanded(child: _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex)),
+              const SizedBox(height: 6),
               _buildHoveredInfo(items, isIncome: isIncome, touchedIndex: touchedIndex),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               _buildLegend(items, isIncome: isIncome),
             ],
           ],
@@ -310,48 +291,65 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildNavigationActions(BuildContext context) {
+  Widget _buildFooterActions(BuildContext context, double saldo) {
     return Row(
       children: [
         Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1565C0),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(getGastosAnalise(), maxLines: 2, overflow: TextOverflow.ellipsis),
             ),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
-            icon: const Icon(Icons.receipt_long),
-            label: const Text('Transações'),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                'Com ${_currencyFormatter.format(saldo)} de saldo, invista R\$100/mês para chegar a R\$1200 em 1 ano.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
-            icon: const Icon(Icons.trending_up),
-            label: const Text('Investimentos'),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A1B9A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
-            icon: const Icon(Icons.shopping_cart_checkout),
-            label: const Text('Lista de Compras'),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
+                  icon: const Icon(Icons.receipt_long, size: 16),
+                  label: const Text('Transações', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
+                  icon: const Icon(Icons.trending_up, size: 16),
+                  label: const Text('Invest.', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+                  icon: const Icon(Icons.shopping_cart_checkout, size: 16),
+                  label: const Text('Compras', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -365,56 +363,79 @@ class DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_isLoading) const LinearProgressIndicator(),
-              if (_isLoading) const SizedBox(height: 16),
-              Text(
-                'Balanço: ${_currencyFormatter.format(saldo)}',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              _buildPieChartCard(
-                title: 'Entradas por Categoria',
-                data: entradasPorCategoria,
-                isIncome: true,
-              ),
-              const SizedBox(height: 16),
-              _buildPieChartCard(
-                title: 'Saídas por Categoria',
-                data: saidasPorCategoria,
-                isIncome: false,
-              ),
-              const SizedBox(height: 20),
-              Card(
-                color: Colors.white,
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(getGastosAnalise(), style: const TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Card(
-                color: Colors.white,
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Dica para poupança: Com ${_currencyFormatter.format(saldo)} sobrando, invista R\$100/mês para acumular R\$1200 em 1 ano!',
-                    style: const TextStyle(fontSize: 16),
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 900;
+
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFooterActions(context, saldo),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isLoading) const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Entradas por Categoria',
+                          data: entradasPorCategoria,
+                          isIncome: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Saídas por Categoria',
+                          data: saidasPorCategoria,
+                          isIncome: false,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              _buildNavigationActions(context),
-            ],
-          ),
+                const SizedBox(height: 8),
+                _buildFooterActions(context, saldo),
+              ],
+            );
+          },
         ),
       ),
     );
