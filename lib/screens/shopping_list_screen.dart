@@ -168,9 +168,6 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
   List<String> get _itensDepartamentoAtual =>
       _catalogoPorDepartamento[_departamentoSelecionado] ?? [];
 
-  List<String> get _todosItensCatalogo =>
-      _catalogoPorDepartamento.values.expand((e) => e).toSet().toList()..sort();
-
   @override
   void initState() {
     super.initState();
@@ -460,10 +457,11 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                           ),
                                         )
                                         .toList(),
-                                    onChanged: (v) => setState(
-                                      () => _departamentoSelecionado =
-                                          v ?? _departamentoSelecionado,
-                                    ),
+                                    onChanged: (v) => setState(() {
+                                      _departamentoSelecionado =
+                                          v ?? _departamentoSelecionado;
+                                      _itemController.clear();
+                                    }),
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String>(
@@ -486,10 +484,12 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                   const SizedBox(height: 8),
                                   Autocomplete<String>(
                                     optionsBuilder: (textEditingValue) {
+                                      final itensDepartamento =
+                                          _itensDepartamentoAtual;
                                       if (textEditingValue.text.isEmpty) {
-                                        return _todosItensCatalogo;
+                                        return itensDepartamento;
                                       }
-                                      return _todosItensCatalogo.where(
+                                      return itensDepartamento.where(
                                         (option) => option.toLowerCase().contains(
                                               textEditingValue.text.toLowerCase(),
                                             ),
