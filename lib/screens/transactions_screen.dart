@@ -436,29 +436,53 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 final data = List<TransactionModel>.from(snapshot.data ?? [])
                   ..sort((a, b) => b.data.compareTo(a.data));
 
-                return Column(
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 10),
-                    _buildSummary(data),
-                    const SizedBox(height: 10),
-                    _buildForm(),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: data.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Sem transações ainda.',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: data.length,
-                              itemBuilder: (context, index) =>
-                                  _buildTile(data[index]),
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isWide = constraints.maxWidth >= 1100;
+
+                    final Widget listWidget = data.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Sem transações ainda.',
+                              style: TextStyle(color: Colors.white),
                             ),
-                    ),
-                  ],
+                          )
+                        : ListView.builder(
+                            itemCount: data.length,
+                            itemBuilder: (context, index) => _buildTile(data[index]),
+                          );
+
+                    return Column(
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 10),
+                        _buildSummary(data),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: isWide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        child: _buildForm(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: listWidget),
+                                  ],
+                                )
+                              : Column(
+                                  children: [
+                                    _buildForm(),
+                                    const SizedBox(height: 10),
+                                    Expanded(child: listWidget),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
