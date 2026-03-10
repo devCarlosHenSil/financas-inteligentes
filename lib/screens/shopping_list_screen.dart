@@ -491,9 +491,10 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Autocomplete<String>(
+                                    key: ValueKey('autocomplete-$_departamentoSelecionado'),
                                     optionsBuilder: (textEditingValue) {
                                       final itensDepartamento =
-                                          _itensDepartamentoAtual;
+                                          List<String>.from(_itensDepartamentoAtual);
                                       if (textEditingValue.text.isEmpty) {
                                         return itensDepartamento;
                                       }
