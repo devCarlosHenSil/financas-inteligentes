@@ -87,6 +87,15 @@ class DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+
+  String getGastosAnalise() {
+    if (totalSuperfluos > totalSaidas * 0.3) {
+      return 'Você gastou muito em supérfluos (${_currencyFormatter.format(totalSuperfluos)}). Revise gastos variáveis para equilibrar o mês.';
+    }
+
+    return 'Bons gastos! Supérfluos sob controle (${_currencyFormatter.format(totalSuperfluos)}).';
+  }
+
   List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
     return data.entries.map((entry) => _CategoryTotal(nome: entry.key, valor: entry.value)).toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
@@ -486,6 +495,68 @@ class DashboardScreenState extends State<DashboardScreen> {
               ],
             );
           },
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = totalEntradas - totalSaidas;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 1000;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Balanço: ${_currencyFormatter.format(saldo)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        SizedBox(width: isNarrow ? 8 : 10),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildInsightsAndActions(context, saldo),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
