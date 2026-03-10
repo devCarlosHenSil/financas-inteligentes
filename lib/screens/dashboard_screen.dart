@@ -169,12 +169,13 @@ class DashboardScreenState extends State<DashboardScreen> {
   }) {
     if (items.isEmpty) return [];
 
-    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+    final total = items.fold<double>(0.0, (sum, item) => sum + item.valor);
 
     return List.generate(items.length, (index) {
       final item = items[index];
 
-      final percent = total == 0 ? 0 : (item.valor / total) * 100;
+      final double percent =
+          total == 0 ? 0.0 : (item.valor / total) * 100.0;
 
       final isTouched = index == touchedIndex;
 
@@ -202,9 +203,10 @@ class DashboardScreenState extends State<DashboardScreen> {
       return null;
     }
 
-    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+    final total = items.fold<double>(0.0, (sum, item) => sum + item.valor);
     final selectedItem = items[touchedIndex];
-    final percent = total == 0 ? 0 : (selectedItem.valor / total) * 100;
+    final double percent =
+        total == 0 ? 0.0 : (selectedItem.valor / total) * 100.0;
 
     return _CategorySelection(item: selectedItem, percent: percent);
   }
