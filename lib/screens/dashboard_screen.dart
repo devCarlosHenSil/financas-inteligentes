@@ -452,6 +452,91 @@ class DashboardScreenState extends State<DashboardScreen> {
             );
           },
         ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = totalEntradas - totalSaidas;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Dashboard')),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 900;
+
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isLoading) const LinearProgressIndicator(),
+                  const SizedBox(height: 8),
+                  Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFooterActions(context, saldo),
+                ],
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isLoading) const LinearProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Entradas por Categoria',
+                          data: entradasPorCategoria,
+                          isIncome: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _buildChartCard(
+                          title: 'Saídas por Categoria',
+                          data: saidasPorCategoria,
+                          isIncome: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildFooterActions(context, saldo),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
