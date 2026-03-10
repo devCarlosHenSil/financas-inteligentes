@@ -207,8 +207,10 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
+                    SizedBox(
+                      height: 320,
+                      child: Row(
+                        children: [
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -372,7 +374,8 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                             ),
                           ),
                         ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Expanded(
