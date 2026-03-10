@@ -325,6 +325,7 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
   }
 
   Widget _buildComparativo(String item, List<ShoppingItemModel> historico) {
+    final colorScheme = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final mesAtual = historico
         .where((h) =>
@@ -363,18 +364,20 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: maisBarato ? Colors.green : Colors.red,
+        color: maisBarato ? colorScheme.tertiary : colorScheme.error,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
+            colors: [colorScheme.primary, colorScheme.primaryContainer],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -404,12 +407,11 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Lista de Compras Inteligente',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
+                            style: textTheme.headlineSmall?.copyWith(
+                              color: colorScheme.onPrimary,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -426,7 +428,7 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                         IconButton(
                           tooltip: 'Atualizar localização',
                           onPressed: _detectarCidadePorGeolocalizacao,
-                          icon: const Icon(Icons.my_location, color: Colors.white),
+                          icon: Icon(Icons.my_location, color: colorScheme.onPrimary),
                         ),
                       ],
                     ),
@@ -435,7 +437,9 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                       _localizando
                           ? 'Detectando sua cidade...'
                           : 'Cidade atual para promoções: $_cidadeSelecionada',
-                      style: const TextStyle(color: Colors.white70),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     SizedBox(
@@ -443,14 +447,11 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                children: [
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  children: [
                                   DropdownButtonFormField<String>(
                                     initialValue: _departamentoSelecionado,
                                     decoration: const InputDecoration(
@@ -534,7 +535,7 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                   const SizedBox(height: 8),
                                   SizedBox(
                                     width: double.infinity,
-                                    child: ElevatedButton.icon(
+                                    child: FilledButton.icon(
                                       onPressed: _salvarItemHistorico,
                                       icon: const Icon(Icons.add_shopping_cart),
                                       label: const Text(
@@ -544,71 +545,68 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                                   ),
                                 ],
                               ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Itens do departamento: $_departamentoSelecionado',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Itens do departamento: $_departamentoSelecionado',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: _itensDepartamentoAtual
-                                        .map(
-                                          (item) => ActionChip(
-                                            label: Text(item),
-                                            onPressed: () => _adicionarAoCarrinho(item),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Melhores preços em $_cidadeSelecionada',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: ListView.builder(
-                                      itemCount: promocoesCidade.length,
-                                      itemBuilder: (context, index) {
-                                        final promo = promocoesCidade[index];
-                                        return ListTile(
-                                          dense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                          title: Text(
-                                            '${promo['item']} • ${promo['mercado']}',
-                                          ),
-                                          trailing: Text(
-                                            _currency.format(promo['preco'] as double),
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.w700,
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: _itensDepartamentoAtual
+                                          .map(
+                                            (item) => ActionChip(
+                                              label: Text(item),
+                                              onPressed: () => _adicionarAoCarrinho(item),
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          )
+                                          .toList(),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Melhores preços em $_cidadeSelecionada',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Expanded(
+                                      child: ListView.builder(
+                                        itemCount: promocoesCidade.length,
+                                        itemBuilder: (context, index) {
+                                          final promo = promocoesCidade[index];
+                                          return ListTile(
+                                            dense: true,
+                                            contentPadding: EdgeInsets.zero,
+                                            title: Text(
+                                              '${promo['item']} • ${promo['mercado']}',
+                                            ),
+                                            trailing: Text(
+                                              _currency.format(promo['preco'] as double),
+                                              style: TextStyle(
+                                                color: colorScheme.tertiary,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -620,130 +618,124 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Carrinho de compras',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Carrinho de compras',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    'Total estimado antes do caixa: ${_currency.format(totalCarrinho)}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF1D4ED8),
-                                      fontWeight: FontWeight.w700,
+                                    Text(
+                                      'Total estimado antes do caixa: ${_currency.format(totalCarrinho)}',
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: _carrinho.isEmpty
-                                        ? const Center(
-                                            child: Text('Carrinho vazio.'),
-                                          )
-                                        : ListView(
-                                            children: _carrinho.entries.map((entry) {
-                                              final preco =
-                                                  _precoAtualOuPromocao(entry.key, historico);
-                                              return ListTile(
-                                                title: Text(entry.key),
-                                                subtitle: Text(
-                                                  'Preço ref.: ${_currency.format(preco)}',
-                                                ),
-                                                trailing: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    IconButton(
-                                                      onPressed: () =>
-                                                          _alterarQuantidade(entry.key, -1),
-                                                      icon: const Icon(
-                                                        Icons.remove_circle_outline,
+                                    const SizedBox(height: 8),
+                                    Expanded(
+                                      child: _carrinho.isEmpty
+                                          ? const Center(
+                                              child: Text('Carrinho vazio.'),
+                                            )
+                                          : ListView(
+                                              children: _carrinho.entries.map((entry) {
+                                                final preco =
+                                                    _precoAtualOuPromocao(entry.key, historico);
+                                                return ListTile(
+                                                  title: Text(entry.key),
+                                                  subtitle: Text(
+                                                    'Preço ref.: ${_currency.format(preco)}',
+                                                  ),
+                                                  trailing: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      IconButton(
+                                                        onPressed: () =>
+                                                            _alterarQuantidade(entry.key, -1),
+                                                        icon: const Icon(
+                                                          Icons.remove_circle_outline,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    Text('${entry.value}'),
-                                                    IconButton(
-                                                      onPressed: () =>
-                                                          _alterarQuantidade(entry.key, 1),
-                                                      icon: const Icon(
-                                                        Icons.add_circle_outline,
+                                                      Text('${entry.value}'),
+                                                      IconButton(
+                                                        onPressed: () =>
+                                                            _alterarQuantidade(entry.key, 1),
+                                                        icon: const Icon(
+                                                          Icons.add_circle_outline,
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ),
-                                  ),
-                                ],
+                                                    ],
+                                                  ),
+                                                );
+                                              }).toList(),
+                                            ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Comparativos históricos por item',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Comparativos históricos por item',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: historico.isEmpty
-                                        ? const Center(
-                                            child: Text('Sem compras no histórico.'),
-                                          )
-                                        : ListView.builder(
-                                            itemCount: historico.length,
-                                            itemBuilder: (context, index) {
-                                              final item = historico[index];
-                                              return Card(
-                                                child: ListTile(
-                                                  title: Text(
-                                                    '${item.nome} • ${_currency.format(item.preco)}',
+                                    const SizedBox(height: 8),
+                                    Expanded(
+                                      child: historico.isEmpty
+                                          ? const Center(
+                                              child: Text('Sem compras no histórico.'),
+                                            )
+                                          : ListView.builder(
+                                              itemCount: historico.length,
+                                              itemBuilder: (context, index) {
+                                                final item = historico[index];
+                                                return Card(
+                                                  child: ListTile(
+                                                    title: Text(
+                                                      '${item.nome} • ${_currency.format(item.preco)}',
+                                                    ),
+                                                    subtitle: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          DateFormat('dd/MM/yyyy')
+                                                              .format(item.data),
+                                                        ),
+                                                        _buildComparativo(
+                                                          item.nome,
+                                                          historico,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    trailing: IconButton(
+                                                      icon: const Icon(Icons.delete_outline),
+                                                      onPressed: () =>
+                                                          _service.removeShoppingItem(item.id),
+                                                    ),
                                                   ),
-                                                  subtitle: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        DateFormat('dd/MM/yyyy')
-                                                            .format(item.data),
-                                                      ),
-                                                      _buildComparativo(
-                                                        item.nome,
-                                                        historico,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  trailing: IconButton(
-                                                    icon: const Icon(Icons.delete_outline),
-                                                    onPressed: () =>
-                                                        _service.removeShoppingItem(item.id),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                  ),
-                                ],
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

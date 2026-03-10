@@ -202,21 +202,60 @@ class ApiService {
     return double.tryParse(value.toString()) ?? 0;
   }
 
+  double _pickCurrencyBid(
+    Map<String, dynamic> data, {
+    required String from,
+    required String to,
+  }) {
+    final list = data['currency'];
+    if (list is! List) return 0;
+    for (final entry in list) {
+      if (entry is! Map) continue;
+      final fromCurrency = (entry['fromCurrency'] ?? entry['from'] ?? '').toString().toUpperCase();
+      final toCurrency = (entry['toCurrency'] ?? entry['to'] ?? '').toString().toUpperCase();
+      if (fromCurrency == from && toCurrency == to) {
+        return _toDouble(entry['bidPrice'] ?? entry['bid'] ?? entry['bidPriceRaw']);
+      }
+    }
+    return 0;
+  }
+
+  double _pickCryptoPrice(Map<String, dynamic> data, String coin) {
+    final list = data['coins'];
+    if (list is! List) return 0;
+    for (final entry in list) {
+      if (entry is! Map) continue;
+      final code = (entry['coin'] ?? entry['symbol'] ?? '').toString().toUpperCase();
+      if (code == coin) {
+        return _toDouble(entry['regularMarketPrice'] ?? entry['price']);
+      }
+    }
+    return 0;
+  }
+
   Future<Map<String, double>> getRealtimeQuotes() async {
     try {
       final fxData = await _getJsonMap(
-        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL',
+        _brapiProxyUri(
+          'brapiCurrency',
+          {'currency': 'USD-BRL,EUR-BRL'},
+        ).toString(),
+        allowProxy: false,
       );
 
       final cryptoData = await _getJsonMap(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
+        _brapiProxyUri(
+          'brapiCrypto',
+          {'coin': 'BTC,ETH', 'currency': 'BRL'},
+        ).toString(),
+        allowProxy: false,
       );
 
       return {
-        'USD': _toDouble(fxData['USDBRL']?['bid']),
-        'EUR': _toDouble(fxData['EURBRL']?['bid']),
-        'BTC': _toDouble(cryptoData['bitcoin']?['brl']),
-        'ETH': _toDouble(cryptoData['ethereum']?['brl']),
+        'USD': _pickCurrencyBid(fxData, from: 'USD', to: 'BRL'),
+        'EUR': _pickCurrencyBid(fxData, from: 'EUR', to: 'BRL'),
+        'BTC': _pickCryptoPrice(cryptoData, 'BTC'),
+        'ETH': _pickCryptoPrice(cryptoData, 'ETH'),
       };
     } catch (_) {
       return {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};

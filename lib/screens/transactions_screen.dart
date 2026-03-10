@@ -214,18 +214,20 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildHeader() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        color: Colors.white.withAlpha((0.10 * 255).round()),
-        border: Border.all(color: Colors.white24),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: const Row(
+      child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: Colors.white,
-            child: Icon(Icons.receipt_long, color: Color(0xFF1E3A8A)),
+            backgroundColor: colorScheme.surface,
+            child: Icon(Icons.receipt_long, color: colorScheme.primary),
           ),
           SizedBox(width: 12),
           Expanded(
@@ -234,15 +236,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               children: [
                 Text(
                   'Transações',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
+                  style: textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 Text(
                   'Gerencie entradas e saídas com visão premium.',
-                  style: TextStyle(color: Colors.white70),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                  ),
                 ),
               ],
             ),
@@ -253,6 +256,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildSummary(List<TransactionModel> data) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final entradas = data
         .where((t) => t.tipo == 'entrada')
         .fold<double>(0.0, (sum, t) => sum + t.valor);
@@ -262,22 +267,26 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     Widget card(String label, double value, Color color) {
       return Expanded(
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text(
-                _currency.format(value),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-            ],
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _currency.format(value),
+                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -285,20 +294,21 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     return Row(
       children: [
-        card('Entradas', entradas, const Color(0xFF16A34A)),
+        card('Entradas', entradas, colorScheme.tertiary),
         const SizedBox(width: 10),
-        card('Saídas', saidas, const Color(0xFFDC2626)),
+        card('Saídas', saidas, colorScheme.error),
         const SizedBox(width: 10),
-        card('Saldo', entradas - saidas, const Color(0xFF1D4ED8)),
+        card('Saldo', entradas - saidas, colorScheme.primary),
       ],
     );
   }
 
   Widget _buildForm() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -309,30 +319,24 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: ChoiceChip(
-                  label: const Text('Entrada'),
-                  selected: tipo == 'entrada',
-                  onSelected: (_) => setState(() {
-                    tipo = 'entrada';
-                    categoria = '';
-                  }),
-                ),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'entrada',
+                label: Text('Entrada'),
+                icon: Icon(Icons.arrow_downward),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ChoiceChip(
-                  label: const Text('Saída'),
-                  selected: tipo == 'saida',
-                  onSelected: (_) => setState(() {
-                    tipo = 'saida';
-                    categoria = '';
-                  }),
-                ),
+              ButtonSegment(
+                value: 'saida',
+                label: Text('Saída'),
+                icon: Icon(Icons.arrow_upward),
               ),
             ],
+            selected: {tipo},
+            onSelectionChanged: (value) => setState(() {
+              tipo = value.first;
+              categoria = '';
+            }),
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
@@ -358,7 +362,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: _addTransaction,
               icon: const Icon(Icons.add),
               label: const Text('Adicionar transação'),
@@ -370,22 +374,18 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildTile(TransactionModel t) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isEntrada = t.tipo == 'entrada';
 
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.black12),
-      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor:
-              isEntrada ? const Color(0xFFE7F9EE) : const Color(0xFFFDECEC),
+              isEntrada ? colorScheme.tertiaryContainer : colorScheme.errorContainer,
           child: Icon(
             isEntrada ? Icons.arrow_downward : Icons.arrow_upward,
-            color: isEntrada ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+            color: isEntrada ? colorScheme.tertiary : colorScheme.error,
           ),
         ),
         title: Text(t.categoria, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -399,7 +399,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
               _currency.format(t.valor),
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                color: isEntrada ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                color: isEntrada ? colorScheme.tertiary : colorScheme.error,
               ),
             ),
             IconButton(
@@ -418,11 +418,12 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
+            colors: [colorScheme.primary, colorScheme.primaryContainer],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -441,10 +442,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     final bool isWide = constraints.maxWidth >= 1100;
 
                     final Widget listWidget = data.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               'Sem transações ainda.',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(color: colorScheme.onPrimary),
                             ),
                           )
                         : ListView.builder(

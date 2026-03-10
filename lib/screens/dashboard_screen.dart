@@ -235,10 +235,12 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildCategoryList(List<_CategoryTotal> items, {required bool isIncome}) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
-      return const Text(
+      return Text(
         'Sem categorias no período.',
-        style: TextStyle(color: Colors.white70),
+        style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       );
     }
 
@@ -263,7 +265,10 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 6),
             Text(
               item.nome,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontSize: 12,
+              ),
             ),
           ],
         );
@@ -316,31 +321,25 @@ class DashboardScreenState extends State<DashboardScreen> {
     required Map<String, double> data,
     required bool isIncome,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final items = _prepareChartData(data);
 
     final touchedIndex =
         isIncome ? _touchedIncomeIndex : _touchedExpenseIndex;
     final selection = _selectedCategory(items, touchedIndex);
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF1D4ED8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
+    return Card(
+      color: colorScheme.surfaceContainerHigh,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
+              style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),
@@ -357,9 +356,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ? 'Passe o mouse em uma fatia para ver a categoria.'
                   : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -383,24 +381,26 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildPremiumHeader(double saldo) {
     final userLabel = _loggedUserLabel();
     final now = DateFormat('MMMM yyyy').format(DateTime.now());
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha((0.10 * 255).round()),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: Colors.white,
+            backgroundColor: colorScheme.surface,
             child: Text(
               userLabel.isNotEmpty ? userLabel[0].toUpperCase() : 'U',
-              style: const TextStyle(
-                color: Color(0xFF1E3A8A),
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.primary,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -410,27 +410,27 @@ class DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Dashboard Financeiro',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
+                  style: textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Olá, $userLabel • ${now[0].toUpperCase()}${now.substring(1)}',
-                  style: const TextStyle(color: Colors.white70),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                  ),
                 ),
               ],
             ),
           ),
           Text(
             _currencyFormatter.format(saldo),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
+            style: textTheme.titleLarge?.copyWith(
+              color: colorScheme.onPrimary,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -439,54 +439,24 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  ButtonStyle _actionButtonStyle() {
-    return ElevatedButton.styleFrom(
-      elevation: 0,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      backgroundColor: Colors.transparent,
-      foregroundColor: Colors.white,
-      disabledBackgroundColor: Colors.transparent,
-      disabledForegroundColor: Colors.white70,
-      shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-  }
-
   Widget _buildActionButton({
     required VoidCallback onPressed,
     required IconData icon,
     required String label,
-    required List<Color> colors,
   }) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton.icon(
-        style: _actionButtonStyle(),
+    return SizedBox(
+      height: 48,
+      child: FilledButton.tonalIcon(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white),
-        label: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        icon: Icon(icon),
+        label: Text(label),
       ),
     );
   }
 
   Widget _buildInsightsAndActions(BuildContext context, double saldo) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final saldoPositivo = saldo >= 0;
 
     final sugestao = saldoPositivo
@@ -498,24 +468,30 @@ class DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    getGastosAnalise(),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-                child: Text(getGastosAnalise()),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    sugestao,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-                child: Text(sugestao),
               ),
             ),
           ],
@@ -535,7 +511,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                 },
                 icon: Icons.receipt_long,
                 label: 'Transações',
-                colors: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
               ),
             ),
             const SizedBox(width: 10),
@@ -551,7 +526,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                 },
                 icon: Icons.trending_up,
                 label: 'Investimentos',
-                colors: const [Color(0xFF7C3AED), Color(0xFF6D28D9)],
               ),
             ),
             const SizedBox(width: 10),
@@ -567,7 +541,6 @@ class DashboardScreenState extends State<DashboardScreen> {
                 },
                 icon: Icons.shopping_cart,
                 label: 'Lista de Compras',
-                colors: const [Color(0xFFEA580C), Color(0xFFC2410C)],
               ),
             ),
           ],
@@ -578,15 +551,16 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final saldo = totalEntradas - totalSaidas;
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF0F172A),
-              Color(0xFF1D4ED8),
+              colorScheme.primary,
+              colorScheme.primaryContainer,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -598,7 +572,8 @@ class DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (_isLoading) const LinearProgressIndicator(),
+                if (_isLoading)
+                  const LinearProgressIndicator(minHeight: 2),
                 const SizedBox(height: 8),
                 _buildPremiumHeader(saldo),
                 const SizedBox(height: 10),

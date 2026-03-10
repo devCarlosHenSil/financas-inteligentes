@@ -81,41 +81,32 @@ class LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  InputDecoration _inputDecoration({
+  InputDecoration _inputDecoration(
+    BuildContext context, {
     required String hint,
     required IconData icon,
     Widget? suffixIcon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: Colors.black.withAlpha((0.58 * 255).round())),
+      hintStyle: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
       prefixIcon: Icon(icon),
       suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Colors.white.withAlpha((0.92 * 255).round()),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withAlpha((0.35 * 255).round())),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF2E7DFF), width: 1.4),
-      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
+            colors: [colorScheme.primary, colorScheme.primaryContainer],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -125,9 +116,9 @@ class LoginScreenState extends State<LoginScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
               child: Card(
-                elevation: 14,
-                shadowColor: Colors.black54,
-                color: Colors.white.withAlpha((0.12 * 255).round()),
+                elevation: 2,
+                shadowColor: colorScheme.shadow,
+                color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.88),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -135,27 +126,35 @@ class LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 42),
+                      Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: colorScheme.onPrimaryContainer,
+                        size: 42,
+                      ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Bem-vindo de volta',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 26,
+                        style: textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: colorScheme.onPrimaryContainer,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Acesse sua conta para continuar.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withAlpha((0.82 * 255).round())),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.82),
+                        ),
                       ),
                       const SizedBox(height: 24),
-                      const Text(
+                      Text(
                         'E-mail',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        style: textTheme.labelLarge?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
@@ -164,12 +163,19 @@ class LoginScreenState extends State<LoginScreen> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
-                        decoration: _inputDecoration(hint: 'seuemail@dominio.com', icon: Icons.mail_outline),
+                        decoration: _inputDecoration(
+                          context,
+                          hint: 'seuemail@dominio.com',
+                          icon: Icons.mail_outline,
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Senha',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        style: textTheme.labelLarge?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
@@ -179,6 +185,7 @@ class LoginScreenState extends State<LoginScreen> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _login(),
                         decoration: _inputDecoration(
+                          context,
                           hint: 'Digite sua senha',
                           icon: Icons.lock_outline,
                           suffixIcon: IconButton(
@@ -192,19 +199,13 @@ class LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 20),
                       SizedBox(
                         height: 48,
-                        child: ElevatedButton(
+                        child: FilledButton(
                           onPressed: isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
                           child: isLoading
                               ? const SizedBox(
                                   width: 22,
                                   height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                                  child: CircularProgressIndicator(strokeWidth: 2.4),
                                 )
                               : const Text('Entrar'),
                         ),
@@ -214,12 +215,6 @@ class LoginScreenState extends State<LoginScreen> {
                         height: 48,
                         child: OutlinedButton(
                           onPressed: isLoading ? null : _register,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withAlpha((0.75 * 255).round())),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                          ),
                           child: const Text('Criar conta'),
                         ),
                       ),

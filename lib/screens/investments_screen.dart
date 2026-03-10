@@ -3,11 +3,17 @@ import 'dart:async';
 import 'package:financas_inteligentes/models/investment_model.dart';
 import 'package:financas_inteligentes/models/provento_model.dart';
 import 'package:financas_inteligentes/models/rentabilidade_model.dart';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
+import 'package:financas_inteligentes/services/import_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 class InvestmentsScreen extends StatefulWidget {
@@ -20,6 +26,7 @@ class InvestmentsScreen extends StatefulWidget {
 class InvestmentsScreenState extends State<InvestmentsScreen> {
   final FirestoreService _service = FirestoreService();
   final ApiService _api = ApiService();
+  final ImportService _importService = ImportService();
   final NumberFormat _currency = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   final List<String> _tiposCarteira = const [
@@ -53,6 +60,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   bool _showIdealAcoes = false;
   bool _showIdealFiis = false;
   bool _showIdealRendaFixa = false;
+  bool _importingProventos = false;
+  bool _importingRentabilidade = false;
 
   bool _isUsdType(String tipo) =>
       tipo == 'Stock' || tipo == 'Reit' || tipo == 'ETFs Internacionais';
@@ -147,6 +156,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final colorScheme = Theme.of(context).colorScheme;
+            final textTheme = Theme.of(context).textTheme;
             final isFundos = _isFundosInvestimentos(tipoSelecionado);
             final isUsd = _isUsdType(tipoSelecionado);
             final isRendaFixa = _isRendaFixa(tipoSelecionado);
@@ -459,16 +470,19 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Text('Valor total', style: TextStyle(fontWeight: FontWeight.w700)),
+                          Text(
+                            'Valor total',
+                            style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
                           const Spacer(),
                           Text(
                             _formatCurrency(total, symbol: isUsd ? 'US\$' : 'R\$'),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
@@ -478,7 +492,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       children: [
                         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
                         const Spacer(),
-                        ElevatedButton.icon(
+                        FilledButton.icon(
                           onPressed: () async {
                             final ativo = isRendaFixa
                                 ? '${emissorController.text.trim()} • $tipoTitulo • $indexador'
@@ -561,12 +575,14 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     String? subtitle,
     IconData? icon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,7 +590,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: const Color(0xFF64748B)),
+                Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 6),
               ],
               Expanded(
@@ -582,7 +598,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                  style: textTheme.labelMedium?.copyWith(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -592,7 +611,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+              child: Text(
+                value,
+                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
           if (subtitle != null) ...[
@@ -601,7 +623,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+              style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -731,39 +753,45 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     EdgeInsets padding = const EdgeInsets.all(16),
     double? height,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       height: height,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: child,
     );
   }
 
   Widget _filterPill(String label, {IconData? leading}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: () {},
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (leading != null) ...[
-              Icon(leading, size: 16, color: const Color(0xFF475569)),
+              Icon(leading, size: 16, color: colorScheme.onSurfaceVariant),
               const SizedBox(width: 6),
             ],
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF64748B)),
+            Icon(Icons.keyboard_arrow_down, size: 16, color: colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -772,26 +800,34 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
 
   Widget _pill(
     String label, {
-    Color background = const Color(0xFFF1F5F9),
-    Color textColor = const Color(0xFF0F172A),
+    Color? background,
+    Color? textColor,
     IconData? icon,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final bg = background ?? colorScheme.surfaceContainerHighest;
+    final fg = textColor ?? colorScheme.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: background,
+        color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: textColor),
+            Icon(icon, size: 14, color: fg),
             const SizedBox(width: 6),
           ],
           Text(
             label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
+            style: textTheme.labelSmall?.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
           ),
         ],
       ),
@@ -803,6 +839,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     required String selected,
     required ValueChanged<String> onChanged,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return SegmentedButton<String>(
       segments: options.map((opt) => ButtonSegment(value: opt, label: Text(opt))).toList(),
       selected: {selected},
@@ -810,15 +847,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
       style: ButtonStyle(
         visualDensity: VisualDensity.compact,
         padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-        side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFE2E8F0))),
+        side: WidgetStateProperty.all(BorderSide(color: colorScheme.outlineVariant)),
         backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? const Color(0xFFF1F5F9) : Colors.white,
+          (states) => states.contains(WidgetState.selected)
+              ? colorScheme.surfaceContainerHighest
+              : colorScheme.surfaceContainerLow,
         ),
       ),
     );
   }
 
   Widget _donutChartWithLegend(List<_LegendEntry> entries, {bool showAmount = true}) {
+    final textTheme = Theme.of(context).textTheme;
     final total = entries.fold<double>(0, (sum, item) => sum + item.amount);
     if (total <= 0) {
       return const Center(child: Text('Sem dados no momento.'));
@@ -862,11 +902,23 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(entry.label, overflow: TextOverflow.ellipsis)),
-                  Text('${pct.toStringAsFixed(2)}%', style: const TextStyle(fontSize: 12)),
+                  Expanded(
+                    child: Text(
+                      entry.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall,
+                    ),
+                  ),
+                  Text(
+                    '${pct.toStringAsFixed(2)}%',
+                    style: textTheme.bodySmall,
+                  ),
                   if (showAmount) ...[
                     const SizedBox(width: 8),
-                    Text(_currency.format(entry.amount), style: const TextStyle(fontSize: 12)),
+                    Text(
+                      _currency.format(entry.amount),
+                      style: textTheme.bodySmall,
+                    ),
                   ],
                   const SizedBox(width: 10),
                   SizedBox(
@@ -1045,6 +1097,240 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     );
   }
 
+  Future<void> _importProventosCsv() async {
+    if (_importingProventos) return;
+    setState(() => _importingProventos = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) {
+        setState(() => _importingProventos = false);
+        return;
+      }
+      final file = result.files.single;
+      String content;
+      if (kIsWeb) {
+        final bytes = file.bytes;
+        if (bytes == null) {
+          throw Exception('Arquivo inválido.');
+        }
+        content = utf8.decode(bytes);
+      } else {
+        final path = file.path;
+        if (path == null) {
+          throw Exception('Arquivo inválido.');
+        }
+        content = await File(path).readAsString();
+      }
+
+      final items = _importService.parseProventosCsv(content);
+      final existing = await _service.getProventosOnce();
+      final existingKeys = existing.map(_proventoKey).toSet();
+      final toInsert = <ProventoModel>[];
+      var skipped = 0;
+      for (final item in items) {
+        final key = _proventoKey(item);
+        if (existingKeys.contains(key)) {
+          skipped++;
+          continue;
+        }
+        existingKeys.add(key);
+        toInsert.add(item);
+      }
+      await _service.addProventosBatch(toInsert);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Proventos importados: ${toInsert.length} • Ignorados: $skipped')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao importar proventos: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingProventos = false);
+    }
+  }
+
+  Future<void> _importRentabilidadeCsv() async {
+    if (_importingRentabilidade) return;
+    setState(() => _importingRentabilidade = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) {
+        setState(() => _importingRentabilidade = false);
+        return;
+      }
+      final file = result.files.single;
+      String content;
+      if (kIsWeb) {
+        final bytes = file.bytes;
+        if (bytes == null) {
+          throw Exception('Arquivo inválido.');
+        }
+        content = utf8.decode(bytes);
+      } else {
+        final path = file.path;
+        if (path == null) {
+          throw Exception('Arquivo inválido.');
+        }
+        content = await File(path).readAsString();
+      }
+
+      final items = _importService.parseRentabilidadeCsv(content);
+      final existing = await _service.getRentabilidadeOnce();
+      final existingKeys = existing.map(_rentabilidadeKey).toSet();
+      final toInsert = <RentabilidadeModel>[];
+      var skipped = 0;
+      for (final item in items) {
+        final key = _rentabilidadeKey(item);
+        if (existingKeys.contains(key)) {
+          skipped++;
+          continue;
+        }
+        existingKeys.add(key);
+        toInsert.add(item);
+      }
+      await _service.addRentabilidadeBatch(toInsert);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rentabilidade importada: ${toInsert.length} • Ignorados: $skipped')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao importar rentabilidade: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingRentabilidade = false);
+    }
+  }
+
+  Future<void> _importProventosApi() async {
+    final url = await _promptImportUrl('Importar Proventos via API');
+    if (url == null) return;
+    setState(() => _importingProventos = true);
+    try {
+      final data = await _importService.fetchJsonList(url);
+      final items = _importService.parseProventosJson(data);
+      final existing = await _service.getProventosOnce();
+      final existingKeys = existing.map(_proventoKey).toSet();
+      final toInsert = <ProventoModel>[];
+      var skipped = 0;
+      for (final item in items) {
+        final key = _proventoKey(item);
+        if (existingKeys.contains(key)) {
+          skipped++;
+          continue;
+        }
+        existingKeys.add(key);
+        toInsert.add(item);
+      }
+      await _service.addProventosBatch(toInsert);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Proventos importados: ${toInsert.length} • Ignorados: $skipped')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao importar proventos: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingProventos = false);
+    }
+  }
+
+  Future<void> _importRentabilidadeApi() async {
+    final url = await _promptImportUrl('Importar Rentabilidade via API');
+    if (url == null) return;
+    setState(() => _importingRentabilidade = true);
+    try {
+      final data = await _importService.fetchJsonList(url);
+      final items = _importService.parseRentabilidadeJson(data);
+      final existing = await _service.getRentabilidadeOnce();
+      final existingKeys = existing.map(_rentabilidadeKey).toSet();
+      final toInsert = <RentabilidadeModel>[];
+      var skipped = 0;
+      for (final item in items) {
+        final key = _rentabilidadeKey(item);
+        if (existingKeys.contains(key)) {
+          skipped++;
+          continue;
+        }
+        existingKeys.add(key);
+        toInsert.add(item);
+      }
+      await _service.addRentabilidadeBatch(toInsert);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rentabilidade importada: ${toInsert.length} • Ignorados: $skipped')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao importar rentabilidade: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingRentabilidade = false);
+    }
+  }
+
+  Future<String?> _promptImportUrl(String title) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'URL da API (JSON)',
+              hintText: 'https://...',
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Importar'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return result != null && result.isNotEmpty ? result : null;
+  }
+
+  String _proventoKey(ProventoModel item) {
+    final date = DateFormat('yyyy-MM-dd').format(item.dataPagamento);
+    return '${item.ativo}|${item.tipoPagamento}|$date|${item.valorTotal.toStringAsFixed(2)}|${item.quantidade.toStringAsFixed(6)}';
+  }
+
+  String _rentabilidadeKey(RentabilidadeModel item) {
+    final date = DateFormat('yyyy-MM').format(item.data);
+    return '$date|${item.rentabilidade.toStringAsFixed(4)}|${item.cdi.toStringAsFixed(4)}';
+  }
+
   Widget _buildResumoTab({
     required List<InvestmentModel> investments,
     required double patrimonio,
@@ -1052,12 +1338,17 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     required Map<String, double> dist,
     required Map<String, List<InvestmentModel>> grouped,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Resumo dos Investimentos', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w800)),
+          Text(
+            'Resumo dos Investimentos',
+            style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 14),
           if (_loadingMarket) const LinearProgressIndicator(),
           GridView.count(
@@ -1116,7 +1407,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Evolução dos lançamentos', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                      Text(
+                        'Evolução dos lançamentos',
+                        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 14),
                       Expanded(child: _evolutionChart(investments)),
                     ],
@@ -1130,7 +1424,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Ativos na carteira', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                      Text(
+                        'Ativos na carteira',
+                        style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 14),
                       Expanded(child: _distributionChart(investments)),
                     ],
@@ -1144,7 +1441,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Meus Ativos (${investments.length})', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+                Text(
+                  'Meus Ativos (${investments.length})',
+                  style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 10),
                 ...grouped.entries.map((entry) {
                   final total = entry.value.fold<double>(0, (sum, inv) => sum + inv.valorInvestido);
@@ -1153,13 +1453,16 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: colorScheme.outlineVariant),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Column(
                       children: [
                         ListTile(
-                          title: Text(entry.key, style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w700)),
+                          title: Text(
+                            entry.key,
+                            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                          ),
                           subtitle: Text('Ativos ${entry.value.length} • Valor total ${_currency.format(total)} • % na carteira ${pct.toStringAsFixed(1)}%'),
                         ),
                         SingleChildScrollView(
@@ -1401,6 +1704,29 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: _importingProventos ? null : _importProventosCsv,
+                    icon: _importingProventos
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.upload_file),
+                    label: const Text('Importar CSV'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _importingProventos ? null : _importProventosApi,
+                    icon: const Icon(Icons.link),
+                    label: const Text('Importar API'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               if (isNarrow) ...[
                 summaryCard,
                 const SizedBox(height: 12),
@@ -1935,6 +2261,29 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    onPressed: _importingRentabilidade ? null : _importRentabilidadeCsv,
+                    icon: _importingRentabilidade
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.upload_file),
+                    label: const Text('Importar CSV'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _importingRentabilidade ? null : _importRentabilidadeApi,
+                    icon: const Icon(Icons.link),
+                    label: const Text('Importar API'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               if (isNarrow) ...[
                 kpiCards,
                 const SizedBox(height: 12),
@@ -1998,8 +2347,11 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: StreamBuilder<List<InvestmentModel>>(
           stream: _service.getInvestments(),
@@ -2020,10 +2372,12 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Investimentos',
-                            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         IconButton(
@@ -2031,7 +2385,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                           icon: const Icon(Icons.refresh),
                         ),
                         const SizedBox(width: 8),
-                        ElevatedButton.icon(
+                        FilledButton.icon(
                           onPressed: _openLaunchDialog,
                           icon: const Icon(Icons.add),
                           label: const Text('Adicionar lançamento'),
@@ -2042,13 +2396,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: TabBar(
-                      labelColor: const Color(0xFF0F172A),
-                      unselectedLabelColor: const Color(0xFF64748B),
-                      indicatorColor: const Color(0xFF0F172A),
+                      labelColor: colorScheme.onSurface,
+                      unselectedLabelColor: colorScheme.onSurfaceVariant,
+                      indicatorColor: colorScheme.primary,
                       indicatorWeight: 2,
                       indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: const Color(0xFFE2E8F0),
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                      dividerColor: colorScheme.outlineVariant,
+                      labelStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                       tabs: const [
                         Tab(text: 'Resumo'),
                         Tab(text: 'Proventos'),
@@ -2084,18 +2438,23 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _topListCard(String title, List<MarketTicker> items) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       height: 280,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: items.isEmpty
@@ -2117,7 +2476,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                             Expanded(
                               child: Text(
                                 '${index + 1}. $displayName',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
                             Text(_currency.format(item.price)),
@@ -2125,7 +2484,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                             Text(
                               '${item.changePercent.toStringAsFixed(2)}%',
                               style: TextStyle(
-                                color: positive ? Colors.green : Colors.red,
+                                color: positive ? colorScheme.tertiary : colorScheme.error,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -2161,6 +2520,7 @@ class _LegendDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2170,7 +2530,7 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(99)),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: textTheme.bodySmall),
       ],
     );
   }

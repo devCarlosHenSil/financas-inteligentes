@@ -81,6 +81,21 @@ class FirestoreService {
     });
   }
 
+  Future<List<ProventoModel>> getProventosOnce() async {
+    final snapshot = await db.collection('usuarios/$userId/proventos').get();
+    return snapshot.docs.map((doc) => ProventoModel.fromMap(doc.data(), doc.id)).toList();
+  }
+
+  Future<void> addProventosBatch(List<ProventoModel> items) async {
+    if (items.isEmpty) return;
+    final batch = db.batch();
+    final col = db.collection('usuarios/$userId/proventos');
+    for (final item in items) {
+      batch.set(col.doc(), item.toMap());
+    }
+    await batch.commit();
+  }
+
   Future<void> addRentabilidade(RentabilidadeModel rentabilidade) async {
     await db.collection('usuarios/$userId/rentabilidade').add(rentabilidade.toMap());
   }
@@ -93,6 +108,21 @@ class FirestoreService {
     return db.collection('usuarios/$userId/rentabilidade').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => RentabilidadeModel.fromMap(doc.data(), doc.id)).toList();
     });
+  }
+
+  Future<List<RentabilidadeModel>> getRentabilidadeOnce() async {
+    final snapshot = await db.collection('usuarios/$userId/rentabilidade').get();
+    return snapshot.docs.map((doc) => RentabilidadeModel.fromMap(doc.data(), doc.id)).toList();
+  }
+
+  Future<void> addRentabilidadeBatch(List<RentabilidadeModel> items) async {
+    if (items.isEmpty) return;
+    final batch = db.batch();
+    final col = db.collection('usuarios/$userId/rentabilidade');
+    for (final item in items) {
+      batch.set(col.doc(), item.toMap());
+    }
+    await batch.commit();
   }
 
   Future<void> addShoppingItem(ShoppingItemModel item) async {
