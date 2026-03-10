@@ -33,6 +33,23 @@ class AssetOption {
 }
 
 class ApiService {
+  static const String _brapiProxyBaseUrl = String.fromEnvironment(
+    'BRAPI_PROXY_BASE_URL',
+    defaultValue: 'https://us-central1-financas-inteligentes-b67db.cloudfunctions.net',
+  );
+
+  Uri _brapiProxyUri(String path, Map<String, String?> params) {
+    final filtered = <String, String>{};
+    params.forEach((key, value) {
+      final cleaned = value?.trim() ?? '';
+      if (cleaned.isNotEmpty) {
+        filtered[key] = cleaned;
+      }
+    });
+    return Uri.parse('$_brapiProxyBaseUrl/$path')
+        .replace(queryParameters: filtered);
+  }
+
   static const Map<String, String> _fallbackNames = {
     'ITSA3': 'Itausa',
     'PETR4': 'Petrobras',
@@ -137,10 +154,18 @@ class ApiService {
     'SPY',
   ];
 
-  Future<dynamic> _getJson(String url) async {
-    final direct = await http.get(Uri.parse(url));
+  Future<dynamic> _getJson(
+    String url, {
+    Map<String, String>? headers,
+    bool allowProxy = true,
+  }) async {
+    final direct = await http.get(Uri.parse(url), headers: headers);
     if (direct.statusCode == 200) {
       return jsonDecode(direct.body);
+    }
+
+    if (!allowProxy) {
+      throw Exception('Falha ao buscar dados de $url');
     }
 
     final proxyUrl =
@@ -153,33 +178,103 @@ class ApiService {
     throw Exception('Falha ao buscar dados de $url');
   }
 
-  Future<Map<String, dynamic>> _getJsonMap(String url) async {
-    final data = await _getJson(url);
+  Future<Map<String, dynamic>> _getJsonMap(
+    String url, {
+    Map<String, String>? headers,
+    bool allowProxy = true,
+  }) async {
+    final data = await _getJson(url, headers: headers, allowProxy: allowProxy);
     return data as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> _getJsonList(String url) async {
-    final data = await _getJson(url);
+  Future<List<dynamic>> _getJsonList(
+    String url, {
+    Map<String, String>? headers,
+    bool allowProxy = true,
+  }) async {
+    final data = await _getJson(url, headers: headers, allowProxy: allowProxy);
     return data as List<dynamic>;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0;
+  }
+
+  double _pickFirstDouble(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      if (map.containsKey(key)) {
+        final value = _toDouble(map[key]);
+        if (value != 0) return value;
+      }
+    }
+    return 0;
   }
 
   Future<Map<String, double>> getRealtimeQuotes() async {
     try {
       final fxData = await _getJsonMap(
-        'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL',
+        _brapiProxyUri('brapiCurrency', {'currency': 'USD-BRL,EUR-BRL'})
+            .toString(),
+        allowProxy: false,
       );
 
       final cryptoData = await _getJsonMap(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
+        _brapiProxyUri('brapiCrypto', {'coin': 'BTC,ETH', 'currency': 'BRL'})
+            .toString(),
+        allowProxy: false,
       );
 
+      final fxList = (fxData['currency'] as List<dynamic>? ?? [])
+          .map((item) => item as Map<String, dynamic>)
+          .toList();
+
+      double currencyBid(String from, String to) {
+        final match = fxList.firstWhere(
+          (item) =>
+              (item['fromCurrency']?.toString().toUpperCase() ?? '') ==
+                  from.toUpperCase() &&
+              (item['toCurrency']?.toString().toUpperCase() ?? '') ==
+                  to.toUpperCase(),
+          orElse: () => {},
+        );
+        if (match.isEmpty) return 0;
+        return _toDouble(match['bidPrice']);
+      }
+
+      final cryptoList = (cryptoData['coins'] as List<dynamic>? ?? [])
+          .map((item) => item as Map<String, dynamic>)
+          .toList();
+
+      double cryptoPrice(String symbol) {
+        final match = cryptoList.firstWhere(
+          (item) =>
+              (item['coin']?.toString().toUpperCase() ??
+                      item['symbol']?.toString().toUpperCase() ??
+                      '') ==
+                  symbol.toUpperCase(),
+          orElse: () => {},
+        );
+        if (match.isEmpty) return 0;
+        return _pickFirstDouble(
+          match,
+          const [
+            'regularMarketPrice',
+            'lastPrice',
+            'price',
+            'close',
+            'bidPrice',
+            'askPrice',
+          ],
+        );
+      }
+
       return {
-        'USD':
-            double.tryParse(fxData['USDBRL']?['bid']?.toString() ?? '0') ?? 0,
-        'EUR':
-            double.tryParse(fxData['EURBRL']?['bid']?.toString() ?? '0') ?? 0,
-        'BTC': (cryptoData['bitcoin']?['brl'] as num?)?.toDouble() ?? 0,
-        'ETH': (cryptoData['ethereum']?['brl'] as num?)?.toDouble() ?? 0,
+        'USD': currencyBid('USD', 'BRL'),
+        'EUR': currencyBid('EUR', 'BRL'),
+        'BTC': cryptoPrice('BTC'),
+        'ETH': cryptoPrice('ETH'),
       };
     } catch (_) {
       return {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
@@ -274,8 +369,9 @@ class ApiService {
           .take(30)
           .map((item) {
             final symbol = (item['symbol'] ?? '-').toString();
-            final name = (item['longname'] ?? item['shortname'] ?? symbol)
-                .toString();
+            final rawName =
+                (item['longname'] ?? item['shortname'] ?? symbol).toString();
+            final name = _normalizeName(symbol, rawName);
             final price = (item['regularMarketPrice'] as num?)?.toDouble() ?? 0;
             final currency = (item['currency'] ?? (region == 'US' ? 'USD' : 'BRL'))
                 .toString();
@@ -298,6 +394,7 @@ class ApiService {
     final quoteType = (item['quoteType'] ?? '').toString().toUpperCase();
     final symbol = (item['symbol'] ?? '').toString().toUpperCase();
     final name = (item['longname'] ?? item['shortname'] ?? '').toString().toUpperCase();
+    final isDefaultReit = _defaultUsReits.contains(symbol);
 
     switch (tipo) {
       case 'Criptomoedas':
@@ -308,7 +405,12 @@ class ApiService {
       case 'Stock':
         return quoteType == 'EQUITY' && !name.contains('REIT');
       case 'Reit':
-        return quoteType == 'EQUITY' && name.contains('REIT');
+        return quoteType == 'EQUITY' &&
+            (isDefaultReit ||
+                name.contains('REIT') ||
+                name.contains('REALTY') ||
+                name.contains('TRUST') ||
+                name.contains('PROPERTIES'));
       case 'FIIs':
       case 'Fundos de Investimentos':
         return quoteType == 'EQUITY' && symbol.endsWith('11');
@@ -359,6 +461,10 @@ class ApiService {
       }
     }
 
+    if (options.isEmpty) {
+      return _defaultAssetsForTipo(tipo);
+    }
+
     return options;
   }
 
@@ -373,10 +479,21 @@ class ApiService {
       }
 
       final trimmed = query.trim();
-      final searchParam =
-          trimmed.isEmpty ? '' : '&search=${Uri.encodeComponent(trimmed)}';
+      final params = <String, String>{
+        'type': brapiType,
+        'limit': '40',
+      };
+      if (trimmed.isNotEmpty) {
+        params['search'] = trimmed;
+        params['sortBy'] = 'name';
+        params['sortOrder'] = 'asc';
+      } else {
+        params['sortBy'] = 'volume';
+        params['sortOrder'] = 'desc';
+      }
       final data = await _getJsonMap(
-        'https://brapi.dev/api/quote/list?type=$brapiType&limit=40$searchParam',
+        _brapiProxyUri('brapiQuoteList', params).toString(),
+        allowProxy: false,
       );
 
       final stocks = (data['stocks'] as List<dynamic>? ?? [])
@@ -585,7 +702,14 @@ class ApiService {
   Future<List<MarketTicker>> _getTopBySymbols(List<String> symbols) async {
     try {
       final data = await _getJsonMap(
-        'https://brapi.dev/api/quote/${symbols.join(',')}?range=1d&interval=1d&fundamental=false&dividends=false',
+        _brapiProxyUri('brapiQuote', {
+          'symbols': symbols.join(','),
+          'range': '1d',
+          'interval': '1d',
+          'fundamental': 'false',
+          'dividends': 'false',
+        }).toString(),
+        allowProxy: false,
       );
 
       final results = (data['results'] as List<dynamic>? ?? []);
@@ -619,7 +743,11 @@ class ApiService {
   Future<MarketTicker?> _getBrapiListQuote(String symbol) async {
     try {
       final data = await _getJsonMap(
-        'https://brapi.dev/api/quote/list?search=${Uri.encodeComponent(symbol)}',
+        _brapiProxyUri('brapiQuoteList', {
+          'search': symbol,
+          'limit': '5',
+        }).toString(),
+        allowProxy: false,
       );
       final stocks = (data['stocks'] as List<dynamic>? ?? [])
           .map((item) => item as Map<String, dynamic>)
@@ -634,7 +762,7 @@ class ApiService {
       final change = (match['change'] as num?)?.toDouble() ?? 0;
       final previous = close - change;
       final changePercent =
-          previous != 0 ? (change / previous) * 100 : 0;
+          previous != 0 ? (change / previous) * 100 : 0.0;
       final rawName = (match['name'] ?? '').toString();
       final normalizedName = _normalizeName(symbol, rawName);
 

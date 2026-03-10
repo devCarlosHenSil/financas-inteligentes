@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"financas-inteligentes-b67db","appId":"1:443207504457:android:73b49ea0f852035c262598","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"financas-inteligentes-b67db","configurations":{"android":"1:443207504457:android:73b49ea0f852035c262598","web":"1:443207504457:web:50330e0732548361262598","windows":"1:443207504457:web:50330e0732548361262598"}}}}}}
+{
+  "functions": {
+    "source": "functions"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "financas-inteligentes-b67db",
+          "appId": "1:443207504457:android:73b49ea0f852035c262598",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "financas-inteligentes-b67db",
+          "configurations": {
+            "android": "1:443207504457:android:73b49ea0f852035c262598",
+            "web": "1:443207504457:web:50330e0732548361262598",
+            "windows": "1:443207504457:web:50330e0732548361262598"
+          }
+        }
+      }
+    }
+  }
+}
