@@ -371,7 +371,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     final saldo = totalEntradas - totalSaidas;
 
@@ -389,10 +389,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   if (_isLoading) const LinearProgressIndicator(),
                   const SizedBox(height: 8),
-                  Text(
-                    'Balanço: ${_currencyFormatter.format(saldo)}',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
+                  Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Expanded(
                     child: Row(
@@ -426,10 +423,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               children: [
                 if (_isLoading) const LinearProgressIndicator(),
                 const SizedBox(height: 8),
-                Text(
-                  'Balanço: ${_currencyFormatter.format(saldo)}',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
+                Text('Balanço: ${_currencyFormatter.format(saldo)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Expanded(
                   child: Row(
