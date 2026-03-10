@@ -169,15 +169,12 @@ class DashboardScreenState extends State<DashboardScreen> {
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
-        title: isTouched ? '${item.nome}\n${percent.toStringAsFixed(1)}%' : '${percent.toStringAsFixed(1)}%',
+        title: isTouched
+            ? '${item.nome}\n${percent.toStringAsFixed(1)}%'
+            : '${percent.toStringAsFixed(1)}%',
         radius: isTouched ? 98 : 84,
-<<<<<<< HEAD
-        titleStyle: const TextStyle(
-          fontSize: 10,
-=======
         titleStyle: TextStyle(
           fontSize: isTouched ? 10 : 9,
->>>>>>> 4bca43f9137012243b1d46fd652243f3fc5ffa3b
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
@@ -202,20 +199,6 @@ class DashboardScreenState extends State<DashboardScreen> {
         ),
         pieTouchData: PieTouchData(
           enabled: true,
-          touchTooltipData: PieTouchTooltipData(
-            tooltipRoundedRadius: 10,
-            tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((spot) {
-                final index = spot.touchedSectionIndex;
-                final item = items[index];
-                return PieTooltipItem(
-                  '${item.nome}\n${_currencyFormatter.format(item.valor)}',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                );
-              }).toList();
-            },
-          ),
           touchCallback: (event, response) {
             final idx = response?.touchedSection?.touchedSectionIndex ?? -1;
 
@@ -239,9 +222,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   }) {
     final items = _prepareChartData(data);
 
-    final touchedIndex = isIncome
-        ? _touchedIncomeIndex
-        : _touchedExpenseIndex;
+    final touchedIndex =
+        isIncome ? _touchedIncomeIndex : _touchedExpenseIndex;
 
     return Container(
       decoration: BoxDecoration(
@@ -256,30 +238,12 @@ class DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-<<<<<<< HEAD
             Text(
               title,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-=======
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            if (items.isEmpty)
-              const Expanded(child: Center(child: Text('Sem dados para o mês atual', style: TextStyle(color: Colors.white))))
-            else
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(flex: 5, child: _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex)),
-                    const SizedBox(height: 8),
-                    _buildHoveredInfo(items, isIncome: isIncome, touchedIndex: touchedIndex),
-                    const SizedBox(height: 8),
-                    Expanded(flex: 6, child: _buildLegend(items, isIncome: isIncome)),
-                  ],
-                ),
->>>>>>> 4bca43f9137012243b1d46fd652243f3fc5ffa3b
               ),
             ),
             const SizedBox(height: 10),
@@ -328,7 +292,6 @@ class DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(width: 10),
         Expanded(
-<<<<<<< HEAD
           child: ElevatedButton.icon(
             onPressed: () {
               Navigator.push(
@@ -398,110 +361,11 @@ class DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                   ],
-=======
-          child: Column(
-            children: [
-              Expanded(
-                child: Tooltip(
-                  message: 'Abrir gerenciamento de transações',
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
-                    icon: const Icon(Icons.receipt_long, size: 16),
-                    label: const Text('Transações', overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: Tooltip(
-                  message: 'Abrir carteira de investimentos',
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
-                    icon: const Icon(Icons.trending_up, size: 16),
-                    label: const Text('Investimentos', overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: Tooltip(
-                  message: 'Abrir lista de compras',
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 10)),
-                    icon: const Icon(Icons.shopping_cart_checkout, size: 16),
-                    label: const Text('Lista de Compras', overflow: TextOverflow.ellipsis),
-                  ),
->>>>>>> 4bca43f9137012243b1d46fd652243f3fc5ffa3b
                 ),
               ),
               const SizedBox(height: 10),
               _buildInsightsAndActions(context, saldo),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final saldo = totalEntradas - totalSaidas;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 1000;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_isLoading) const LinearProgressIndicator(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Balanço: ${_currencyFormatter.format(saldo)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildChartCard(
-                            title: 'Entradas por Categoria',
-                            data: entradasPorCategoria,
-                            isIncome: true,
-                          ),
-                        ),
-                        SizedBox(width: isNarrow ? 8 : 10),
-                        Expanded(
-                          child: _buildChartCard(
-                            title: 'Saídas por Categoria',
-                            data: saidasPorCategoria,
-                            isIncome: false,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildInsightsAndActions(context, saldo),
-                ],
-              );
-            },
           ),
         ),
       ),
