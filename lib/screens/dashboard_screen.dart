@@ -29,6 +29,8 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   StreamSubscription<List<TransactionModel>>? _transactionsSubscription;
   bool _isLoading = true;
+  int _touchedIncomeIndex = -1;
+  int _touchedExpenseIndex = -1;
 
   double totalEntradas = 0, totalSaidas = 0, totalSuperfluos = 0;
   Map<String, double> entradasPorCategoria = {};
@@ -112,50 +114,21 @@ class DashboardScreenState extends State<DashboardScreen> {
   Color _categoryColor(String category, {required bool isIncome}) {
     final name = category.toLowerCase().trim();
 
-    if (name.contains('super mercado') || name.contains('supermercado') || name.contains('mercado')) {
-      return const Color(0xFF43A047); // comida
-    }
-    if (name.contains('moradia') || name.contains('aluguel') || name.contains('casa')) {
-      return const Color(0xFF757575); // cinza
-    }
-    if (name.contains('uber') || name.contains('99')) {
-      return Colors.black; // preto
-    }
-    if (name.contains('lazer') || name.contains('entretenimento') || name.contains('viagem')) {
-      return const Color(0xFF1E88E5); // azul
-    }
-    if (name.contains('serviço de terceiros') || name.contains('servicos de terceiros') || name.contains('terceiros')) {
-      return const Color(0xFF00897B); // teal
-    }
-    if (name.contains('mercado livre')) {
-      return const Color(0xFFFDD835); // amarelo
-    }
-    if (name.contains('shopee')) {
-      return const Color(0xFFFF6D00); // laranja
-    }
-    if (name.contains('amazon')) {
-      return const Color(0xFFFF9900); // cor principal amazon
-    }
-    if (name.contains('magalu') || name.contains('magazine luiza')) {
-      return const Color(0xFF0086FF); // azul magalu
-    }
-    if (name.contains('pix para esposa') || name.contains('esposa')) {
-      return const Color(0xFF8E24AA); // roxo
-    }
+    if (name.contains('super mercado') || name.contains('supermercado') || name.contains('mercado')) return const Color(0xFF43A047);
+    if (name.contains('moradia') || name.contains('aluguel') || name.contains('casa')) return const Color(0xFF757575);
+    if (name.contains('uber') || name.contains('99')) return Colors.black;
+    if (name.contains('lazer') || name.contains('entretenimento') || name.contains('viagem')) return const Color(0xFF1E88E5);
+    if (name.contains('serviço de terceiros') || name.contains('servicos de terceiros') || name.contains('terceiros')) return const Color(0xFF00897B);
+    if (name.contains('mercado livre')) return const Color(0xFFFDD835);
+    if (name.contains('shopee')) return const Color(0xFFFF6D00);
+    if (name.contains('amazon')) return const Color(0xFFFF9900);
+    if (name.contains('magalu') || name.contains('magazine luiza')) return const Color(0xFF0086FF);
+    if (name.contains('pix para esposa') || name.contains('esposa')) return const Color(0xFF8E24AA);
 
-    if (isIncome) {
-      return const Color(0xFF66BB6A);
-    }
-
-    if (name.contains('saúde') || name.contains('saude') || name.contains('farmácia') || name.contains('farmacia')) {
-      return const Color(0xFFEF5350);
-    }
-    if (name.contains('internet') || name.contains('telefone') || name.contains('streaming')) {
-      return const Color(0xFF5C6BC0);
-    }
-    if (name.contains('educação') || name.contains('educacao')) {
-      return const Color(0xFF26A69A);
-    }
+    if (isIncome) return const Color(0xFF66BB6A);
+    if (name.contains('saúde') || name.contains('saude') || name.contains('farmácia') || name.contains('farmacia')) return const Color(0xFFEF5350);
+    if (name.contains('internet') || name.contains('telefone') || name.contains('streaming')) return const Color(0xFF5C6BC0);
+    if (name.contains('educação') || name.contains('educacao')) return const Color(0xFF26A69A);
 
     final hue = (name.codeUnits.fold<int>(0, (sum, c) => sum + c) % 360).toDouble();
     return HSVColor.fromAHSV(1, hue, 0.55, 0.85).toColor();
@@ -164,6 +137,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   List<PieChartSectionData> _getPieSections(
     List<_CategoryTotal> items, {
     required bool isIncome,
+    required int touchedIndex,
   }) {
     if (items.isEmpty) return [];
 
@@ -172,18 +146,18 @@ class DashboardScreenState extends State<DashboardScreen> {
     return List.generate(items.length, (index) {
       final item = items[index];
       final percent = total == 0 ? 0 : (item.valor / total) * 100;
-      final color = _categoryColor(item.nome, isIncome: isIncome);
+      final isTouched = index == touchedIndex;
 
       return PieChartSectionData(
         value: item.valor,
-        color: color,
+        color: _categoryColor(item.nome, isIncome: isIncome),
         title: '${percent.toStringAsFixed(1)}%',
-        radius: 86,
-        titleStyle: const TextStyle(
-          fontSize: 10,
+        radius: isTouched ? 108 : 92,
+        titleStyle: TextStyle(
+          fontSize: isTouched ? 12 : 10,
           fontWeight: FontWeight.w700,
           color: Colors.white,
-          shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
+          shadows: const [Shadow(color: Colors.black54, blurRadius: 2)],
         ),
       );
     });
@@ -192,51 +166,108 @@ class DashboardScreenState extends State<DashboardScreen> {
   Widget _buildLegend(List<_CategoryTotal> items, {required bool isIncome}) {
     final total = items.fold<double>(0, (sum, item) => sum + item.valor);
 
-    return Column(
-      children: List.generate(items.length, (index) {
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 5.8,
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 10,
+      ),
+      itemBuilder: (context, index) {
         final item = items[index];
         final percent = total == 0 ? 0 : (item.valor / total) * 100;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: _categoryColor(item.nome, isIncome: isIncome),
-                  shape: BoxShape.circle,
-                ),
+        return Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: _categoryColor(item.nome, isIncome: isIncome),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.nome,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item.nome,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
-              Text(
-                '${percent.toStringAsFixed(1)}% • ${_currencyFormatter.format(item.valor)}',
-                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${percent.toStringAsFixed(1)}%',
+              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
+            ),
+          ],
         );
-      }),
+      },
     );
   }
 
-  Widget _buildPieChart(List<_CategoryTotal> items, {required bool isIncome}) {
+  Widget _buildHoveredInfo(List<_CategoryTotal> items, {required bool isIncome, required int touchedIndex}) {
+    if (touchedIndex < 0 || touchedIndex >= items.length) {
+      return Text(
+        'Passe o mouse sobre uma fatia para destacar categoria',
+        style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+      );
+    }
+
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+    final touched = items[touchedIndex];
+    final percent = total == 0 ? 0 : (touched.valor / total) * 100;
+
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: _categoryColor(touched.nome, isIncome: isIncome),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${touched.nome} • ${percent.toStringAsFixed(1)}% • ${_currencyFormatter.format(touched.valor)}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPieChart(
+    List<_CategoryTotal> items, {
+    required bool isIncome,
+    required int touchedIndex,
+  }) {
     return SizedBox(
-      height: 260,
+      height: 320,
       child: PieChart(
         PieChartData(
           sectionsSpace: 2,
-          centerSpaceRadius: 44,
-          sections: _getPieSections(items, isIncome: isIncome),
+          centerSpaceRadius: 46,
+          sections: _getPieSections(items, isIncome: isIncome, touchedIndex: touchedIndex),
           borderData: FlBorderData(show: false),
+          pieTouchData: PieTouchData(
+            enabled: true,
+            touchCallback: (event, response) {
+              if (!mounted) return;
+              final idx = response?.touchedSection?.touchedSectionIndex ?? -1;
+              if (isIncome) {
+                setState(() => _touchedIncomeIndex = idx);
+              } else {
+                setState(() => _touchedExpenseIndex = idx);
+              }
+            },
+          ),
         ),
       ),
     );
@@ -248,6 +279,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     required bool isIncome,
   }) {
     final items = _prepareChartData(data);
+    final touchedIndex = isIncome ? _touchedIncomeIndex : _touchedExpenseIndex;
 
     return Card(
       elevation: 3,
@@ -258,10 +290,7 @@ class DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 32/2, fontWeight: FontWeight.bold),
-            ),
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (items.isEmpty)
               const SizedBox(
@@ -269,8 +298,10 @@ class DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('Sem dados para o mês atual')),
               )
             else ...[
-              _buildPieChart(items, isIncome: isIncome),
-              const SizedBox(height: 10),
+              _buildPieChart(items, isIncome: isIncome, touchedIndex: touchedIndex),
+              const SizedBox(height: 8),
+              _buildHoveredInfo(items, isIncome: isIncome, touchedIndex: touchedIndex),
+              const SizedBox(height: 12),
               _buildLegend(items, isIncome: isIncome),
             ],
           ],
@@ -290,10 +321,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TransactionsScreen()),
-            ),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen())),
             icon: const Icon(Icons.receipt_long),
             label: const Text('Transações'),
           ),
@@ -307,10 +335,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const InvestmentsScreen()),
-            ),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
             icon: const Icon(Icons.trending_up),
             label: const Text('Investimentos'),
           ),
@@ -324,10 +349,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ShoppingListScreen()),
-            ),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
             icon: const Icon(Icons.shopping_cart_checkout),
             label: const Text('Lista de Compras'),
           ),
@@ -352,7 +374,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               if (_isLoading) const SizedBox(height: 16),
               Text(
                 'Balanço: ${_currencyFormatter.format(saldo)}',
-                style: const TextStyle(fontSize: 38/1.6, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               _buildPieChartCard(
