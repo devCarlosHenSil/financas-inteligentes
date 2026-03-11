@@ -343,9 +343,9 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
         .toList();
 
     if (mesAtual.isEmpty || mesAnterior.isEmpty) {
-      return const Text(
+      return Text(
         'Sem dados suficientes para comparativo mensal.',
-        style: TextStyle(fontSize: 12, color: Colors.black54),
+        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
       );
     }
 

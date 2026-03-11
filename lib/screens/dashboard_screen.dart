@@ -177,11 +177,12 @@ class DashboardScreenState extends State<DashboardScreen> {
     required bool isIncome,
     required int touchedIndex,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
       return [
         PieChartSectionData(
           value: 1,
-          color: const Color(0xFF64748B),
+          color: colorScheme.onSurfaceVariant,
           title: '',
           radius: 72,
         ),

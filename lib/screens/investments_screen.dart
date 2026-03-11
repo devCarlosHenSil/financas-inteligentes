@@ -450,16 +450,19 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            const Text('Total de cotas', style: TextStyle(fontWeight: FontWeight.w700)),
+                            Text(
+                              'Total de cotas',
+                              style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                            ),
                             const Spacer(),
                             Text(
                               _formatDecimalValue(totalCotas, 8),
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
@@ -697,6 +700,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _evolutionChart(List<InvestmentModel> data) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final now = DateTime.now();
     final months = List.generate(12, (i) => DateTime(now.year, now.month - 11 + i));
     final values = <double>[];
@@ -723,7 +728,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               getTitlesWidget: (value, meta) {
                 final idx = value.toInt();
                 if (idx < 0 || idx >= months.length) return const SizedBox.shrink();
-                return Text(DateFormat('MM/yy').format(months[idx]), style: const TextStyle(fontSize: 10));
+                return Text(
+                  DateFormat('MM/yy').format(months[idx]),
+                  style: textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                );
               },
             ),
           ),
@@ -737,7 +748,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             barRods: [
               BarChartRodData(
                 toY: values[index] < 0 ? 0 : values[index],
-                color: const Color(0xFF10B981),
+                color: colorScheme.tertiary,
                 width: 16,
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -945,6 +956,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _proventosBarChart(List<String> labels, List<double> received, List<double> pending) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final maxValue = List.generate(
       labels.length,
       (index) => received[index] + pending[index],
@@ -964,7 +977,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(labels[idx], style: const TextStyle(fontSize: 10)),
+                  child: Text(
+                    labels[idx],
+                    style: textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 );
               },
             ),
@@ -985,8 +1004,12 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 width: 18,
                 borderRadius: BorderRadius.circular(4),
                 rodStackItems: [
-                  BarChartRodStackItem(0, received[index], const Color(0xFF4C6FFF)),
-                  BarChartRodStackItem(received[index], received[index] + pending[index], const Color(0xFFC7D2FE)),
+                  BarChartRodStackItem(0, received[index], colorScheme.primary),
+                  BarChartRodStackItem(
+                    received[index],
+                    received[index] + pending[index],
+                    colorScheme.primaryContainer,
+                  ),
                 ],
               ),
             ],
@@ -997,6 +1020,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _patrimonioBarChart(List<String> labels, List<double> applied, List<double> gain) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final maxValue = List.generate(
       labels.length,
       (index) => applied[index] + gain[index],
@@ -1016,7 +1041,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(labels[idx], style: const TextStyle(fontSize: 10)),
+                  child: Text(
+                    labels[idx],
+                    style: textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 );
               },
             ),
@@ -1034,8 +1065,12 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 width: 20,
                 borderRadius: BorderRadius.circular(4),
                 rodStackItems: [
-                  BarChartRodStackItem(0, applied[index], const Color(0xFF22C55E)),
-                  BarChartRodStackItem(applied[index], applied[index] + gain[index], const Color(0xFF86EFAC)),
+                  BarChartRodStackItem(0, applied[index], colorScheme.tertiary),
+                  BarChartRodStackItem(
+                    applied[index],
+                    applied[index] + gain[index],
+                    colorScheme.tertiaryContainer,
+                  ),
                 ],
               ),
             ],
@@ -1046,6 +1081,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _rentabilidadeLineChart(List<double> rentabilidade, List<double> cdi, {List<DateTime>? labels}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final values = [...rentabilidade, ...cdi];
     final maxValue = values.fold<double>(0, (max, value) => value > max ? value : max);
     final minValue = values.fold<double>(0, (min, value) => value < min ? value : min);
@@ -1071,7 +1108,13 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 if (idx < 0 || idx >= labelDates.length) return const SizedBox.shrink();
                 final date = labelDates[idx];
                 final label = DateFormat('MM/yy').format(date);
-                return Text(label, style: const TextStyle(fontSize: 10));
+                return Text(
+                  label,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                );
               },
             ),
           ),
@@ -1080,15 +1123,18 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           LineChartBarData(
             spots: List.generate(rentabilidade.length, (index) => FlSpot(index.toDouble(), rentabilidade[index])),
             isCurved: true,
-            color: const Color(0xFF4C6FFF),
+            color: colorScheme.primary,
             barWidth: 2.2,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: const Color(0x144C6FFF)),
+            belowBarData: BarAreaData(
+              show: true,
+              color: colorScheme.primary.withValues(alpha: 0.12),
+            ),
           ),
           LineChartBarData(
             spots: List.generate(cdi.length, (index) => FlSpot(index.toDouble(), cdi[index])),
             isCurved: true,
-            color: const Color(0xFFF59E0B),
+            color: colorScheme.secondary,
             barWidth: 2,
             dotData: const FlDotData(show: false),
           ),
@@ -1485,13 +1531,17 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: operacao == 'Venda' ? Colors.red.shade50 : Colors.green.shade50,
+                                      color: operacao == 'Venda'
+                                          ? colorScheme.errorContainer
+                                          : colorScheme.tertiaryContainer,
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
                                       operacao,
                                       style: TextStyle(
-                                        color: operacao == 'Venda' ? Colors.red.shade700 : Colors.green.shade700,
+                                        color: operacao == 'Venda'
+                                            ? colorScheme.error
+                                            : colorScheme.tertiary,
                                       ),
                                     ),
                                   ),
@@ -1539,6 +1589,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     return StreamBuilder<List<ProventoModel>>(
       stream: _service.getProventos(),
       builder: (context, snapshot) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final textTheme = Theme.of(context).textTheme;
         final proventos = snapshot.data ?? [];
         final now = DateTime.now();
         final months = List.generate(
@@ -1601,45 +1653,72 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Resumo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                'Resumo',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 8),
-              const Text('Média Mensal (últ. 12 meses)', style: TextStyle(color: Color(0xFF64748B))),
+              Text(
+                'Média Mensal (últ. 12 meses)',
+                style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Text(_currency.format(mediaMensal), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                  Text(
+                    _currency.format(mediaMensal),
+                    style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(width: 6),
-                  const Text('/ Criar meta', style: TextStyle(color: Color(0xFF4C6FFF), fontSize: 12)),
+                  Text(
+                    '/ Criar meta',
+                    style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+                  ),
                   const Spacer(),
-                  const Text('0%', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text('0%', style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
                 ],
               ),
               const SizedBox(height: 8),
-              const LinearProgressIndicator(
+              LinearProgressIndicator(
                 value: 0.0,
-                backgroundColor: Color(0xFFE2E8F0),
-                color: Color(0xFF94A3B8),
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                color: colorScheme.primary,
                 minHeight: 3,
               ),
               const SizedBox(height: 12),
               const Divider(),
               Row(
-                children: const [
-                  Text('Total de 12 meses', style: TextStyle(color: Color(0xFF64748B))),
-                  Spacer(),
-                  Icon(Icons.expand_more, size: 18, color: Color(0xFF94A3B8)),
+                children: [
+                  Text(
+                    'Total de 12 meses',
+                    style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.expand_more, size: 18, color: colorScheme.onSurfaceVariant),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(_currency.format(total12m), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                _currency.format(total12m),
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               const Divider(),
-              const Text('Total da carteira', style: TextStyle(color: Color(0xFF64748B))),
+              Text(
+                'Total da carteira',
+                style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 6),
-              Text(_currency.format(totalCarteira), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                _currency.format(totalCarteira),
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               const Divider(),
-              const Text('Distribuição de proventos em 12 meses', style: TextStyle(color: Color(0xFF64748B))),
+              Text(
+                'Distribuição de proventos em 12 meses',
+                style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 12),
               SizedBox(
                 height: 160,
@@ -1661,7 +1740,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             children: [
               Row(
                 children: [
-                  const Text('Evolução de Proventos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Evolução de Proventos',
+                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const Spacer(),
                   _segmentedControl(
                     options: const ['Mensal', 'Anual'],
@@ -1682,10 +1764,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               ),
               const SizedBox(height: 16),
               Row(
-                children: const [
-                  _LegendDot(color: Color(0xFF4C6FFF), label: 'Proventos recebidos'),
-                  SizedBox(width: 12),
-                  _LegendDot(color: Color(0xFFC7D2FE), label: 'Proventos a receber'),
+                children: [
+                  _LegendDot(color: colorScheme.primary, label: 'Proventos recebidos'),
+                  const SizedBox(width: 12),
+                  _LegendDot(color: colorScheme.primaryContainer, label: 'Proventos a receber'),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1748,12 +1830,15 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Text('Histórico mensal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                        Text(
+                          'Histórico mensal',
+                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         const Spacer(),
                         _pill(
                           'Total  ${_currency.format(total12m)}',
-                          background: const Color(0xFFE0F2FE),
-                          textColor: const Color(0xFF0284C7),
+                          background: colorScheme.secondaryContainer,
+                          textColor: colorScheme.onSecondaryContainer,
                         ),
                         const SizedBox(width: 10),
                         _filterPill('Recebidos', leading: Icons.calendar_month_outlined),
@@ -1814,12 +1899,15 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   children: [
                     Row(
                       children: [
-                        const Text('Meus proventos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                        Text(
+                          'Meus proventos',
+                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         const Spacer(),
                         _pill(
                           'Total  ${_currency.format(totalCarteira)}',
-                          background: const Color(0xFFE0F2FE),
-                          textColor: const Color(0xFF0284C7),
+                          background: colorScheme.secondaryContainer,
+                          textColor: colorScheme.onSecondaryContainer,
                         ),
                         const SizedBox(width: 10),
                         _filterPill(currentYearLabel, leading: Icons.calendar_month_outlined),
@@ -1851,14 +1939,20 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                               ],
                               rows: proventosSorted.map((row) {
                                 final statusColor = row.status.toLowerCase().contains('pago')
-                                    ? const Color(0xFFDCFCE7)
-                                    : const Color(0xFFE0F2FE);
+                                    ? colorScheme.tertiaryContainer
+                                    : colorScheme.secondaryContainer;
                                 final statusText = row.status.toLowerCase().contains('pago')
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF0284C7);
+                                    ? colorScheme.tertiary
+                                    : colorScheme.secondary;
                                 return DataRow(cells: [
                                   DataCell(Text(row.ativo)),
-                                  DataCell(_pill(row.tipoAtivo, background: const Color(0xFFF1F5F9), textColor: const Color(0xFF475569))),
+                                  DataCell(
+                                    _pill(
+                                      row.tipoAtivo,
+                                      background: colorScheme.surfaceContainerHighest,
+                                      textColor: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                   DataCell(_pill(row.status, background: statusColor, textColor: statusText, icon: Icons.monetization_on_outlined)),
                                   DataCell(Text(row.tipoPagamento)),
                                   DataCell(Text(DateFormat('dd/MM/yyyy').format(row.dataCom))),
@@ -1881,6 +1975,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
   }
 
   Widget _buildPatrimonioTab({required List<InvestmentModel> investments}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final now = DateTime.now();
     final labels = List.generate(
       12,
@@ -1893,6 +1989,14 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     final gain = List<double>.generate(12, (i) => gainSeed + (i * gainSeed * 0.02)).toList();
 
     final dist = _distributionByType(investments);
+    final palette = [
+      colorScheme.primary,
+      colorScheme.secondary,
+      colorScheme.tertiary,
+      colorScheme.primaryContainer,
+      colorScheme.secondaryContainer,
+      colorScheme.tertiaryContainer,
+    ];
     final consolidacao = dist.isNotEmpty
         ? dist.entries.toList().asMap().entries.map((entry) {
             final idx = entry.key;
@@ -1905,34 +2009,34 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             );
           }).toList()
         : <_LegendEntry>[
-            const _LegendEntry(label: 'Renda Fixa', amount: 601.15, color: Color(0xFF38BDF8)),
-            const _LegendEntry(label: 'Ações', amount: 237.82, color: Color(0xFF5EEAD4)),
-            const _LegendEntry(label: 'FIIs', amount: 209.40, color: Color(0xFFFDE047)),
+            _LegendEntry(label: 'Renda Fixa', amount: 601.15, color: palette[0]),
+            _LegendEntry(label: 'Ações', amount: 237.82, color: palette[1]),
+            _LegendEntry(label: 'FIIs', amount: 209.40, color: palette[2]),
           ];
 
     final acoes = <_LegendEntry>[
-      const _LegendEntry(label: 'BBAS3', amount: 50.42, color: Color(0xFF38BDF8)),
-      const _LegendEntry(label: 'WEGE3', amount: 47.25, color: Color(0xFF22D3EE)),
-      const _LegendEntry(label: 'ITSA3', amount: 40.98, color: Color(0xFF86EFAC)),
-      const _LegendEntry(label: 'BBSE3', amount: 34.71, color: Color(0xFFFDE047)),
-      const _LegendEntry(label: 'EGIE3', amount: 32.70, color: Color(0xFFFCA5A5)),
-      const _LegendEntry(label: 'KLBN3', amount: 31.76, color: Color(0xFFFB7185)),
+      _LegendEntry(label: 'BBAS3', amount: 50.42, color: palette[0]),
+      _LegendEntry(label: 'WEGE3', amount: 47.25, color: palette[1]),
+      _LegendEntry(label: 'ITSA3', amount: 40.98, color: palette[2]),
+      _LegendEntry(label: 'BBSE3', amount: 34.71, color: palette[3]),
+      _LegendEntry(label: 'EGIE3', amount: 32.70, color: palette[4]),
+      _LegendEntry(label: 'KLBN3', amount: 31.76, color: palette[5]),
     ];
 
     final fiis = <_LegendEntry>[
-      const _LegendEntry(label: 'GARE11', amount: 41.75, color: Color(0xFF38BDF8)),
-      const _LegendEntry(label: 'VGIR11', amount: 39.08, color: Color(0xFF22D3EE)),
-      const _LegendEntry(label: 'BTCI11', amount: 36.96, color: Color(0xFF86EFAC)),
-      const _LegendEntry(label: 'VGHF11', amount: 35.25, color: Color(0xFFFDE047)),
-      const _LegendEntry(label: 'XPCA11', amount: 34.88, color: Color(0xFFFCA5A5)),
-      const _LegendEntry(label: 'VINO11', amount: 21.48, color: Color(0xFFFB7185)),
+      _LegendEntry(label: 'GARE11', amount: 41.75, color: palette[0]),
+      _LegendEntry(label: 'VGIR11', amount: 39.08, color: palette[1]),
+      _LegendEntry(label: 'BTCI11', amount: 36.96, color: palette[2]),
+      _LegendEntry(label: 'VGHF11', amount: 35.25, color: palette[3]),
+      _LegendEntry(label: 'XPCA11', amount: 34.88, color: palette[4]),
+      _LegendEntry(label: 'VINO11', amount: 21.48, color: palette[5]),
     ];
 
     final rendaFixa = <_LegendEntry>[
-      const _LegendEntry(
+      _LegendEntry(
         label: 'CDB - BANCO NUBANK - Pós-Fixado - 100% CDI',
         amount: 601.15,
-        color: Color(0xFF38BDF8),
+        color: palette[0],
       ),
     ];
 
@@ -1947,7 +2051,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Evolução do Patrimônio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Evolução do Patrimônio',
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     _filterPill('12 Meses', leading: Icons.calendar_month_outlined),
                     const SizedBox(width: 8),
@@ -1956,10 +2063,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                 ),
                 const SizedBox(height: 12),
                 Row(
-                  children: const [
-                    _LegendDot(color: Color(0xFF22C55E), label: 'Valor aplicado'),
-                    SizedBox(width: 14),
-                    _LegendDot(color: Color(0xFF86EFAC), label: 'Ganho capital'),
+                  children: [
+                    _LegendDot(color: colorScheme.tertiary, label: 'Valor aplicado'),
+                    const SizedBox(width: 14),
+                    _LegendDot(color: colorScheme.tertiaryContainer, label: 'Ganho capital'),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -1974,7 +2081,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Consolidação do patrimônio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Consolidação do patrimônio',
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     _segmentedControl(
                       options: const ['Tipo de ativos', 'Ativos', 'Exposição ao exterior'],
@@ -1982,7 +2092,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       onChanged: (value) => setState(() => _patrimonioConsolidacao = value),
                     ),
                     const SizedBox(width: 12),
-                    const Text('Exibir posição ideal', style: TextStyle(color: Color(0xFF64748B))),
+                    Text(
+                      'Exibir posição ideal',
+                      style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
                     const SizedBox(width: 6),
                     Switch.adaptive(
                       value: _showIdealConsolidacao,
@@ -2002,7 +2115,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Ações', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Ações',
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     _segmentedControl(
                       options: const ['Consolidado', 'Por tipo', 'Por segmento'],
@@ -2010,7 +2126,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       onChanged: (value) => setState(() => _patrimonioAcoes = value),
                     ),
                     const SizedBox(width: 12),
-                    const Text('Exibir posição ideal', style: TextStyle(color: Color(0xFF64748B))),
+                    Text(
+                      'Exibir posição ideal',
+                      style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
                     const SizedBox(width: 6),
                     Switch.adaptive(
                       value: _showIdealAcoes,
@@ -2030,7 +2149,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('FIIs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(
+                      'FIIs',
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
                     _segmentedControl(
                       options: const ['Consolidado', 'Por tipo', 'Por segmento'],
@@ -2038,7 +2160,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                       onChanged: (value) => setState(() => _patrimonioFiis = value),
                     ),
                     const SizedBox(width: 12),
-                    const Text('Exibir posição ideal', style: TextStyle(color: Color(0xFF64748B))),
+                    Text(
+                      'Exibir posição ideal',
+                      style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
                     const SizedBox(width: 6),
                     Switch.adaptive(
                       value: _showIdealFiis,
@@ -2058,9 +2183,15 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               children: [
                 Row(
                   children: [
-                    const Text('Renda Fixa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Renda Fixa',
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     const Spacer(),
-                    const Text('Exibir posição ideal', style: TextStyle(color: Color(0xFF64748B))),
+                    Text(
+                      'Exibir posição ideal',
+                      style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
                     const SizedBox(width: 6),
                     Switch.adaptive(
                       value: _showIdealRendaFixa,
@@ -2082,6 +2213,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
     return StreamBuilder<List<RentabilidadeModel>>(
       stream: _service.getRentabilidade(),
       builder: (context, snapshot) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final textTheme = Theme.of(context).textTheme;
         final entries = [...(snapshot.data ?? [])];
         entries.sort((a, b) => a.data.compareTo(b.data));
 
@@ -2148,9 +2281,9 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
         }
 
         final isNarrow = MediaQuery.of(context).size.width < 1100;
-        final totalColor = totalReturn >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
-        final last12Color = last12Return >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
-        final lastMonthColor = (lastMonth?.rentabilidade ?? 0) >= 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+        final totalColor = totalReturn >= 0 ? colorScheme.tertiary : colorScheme.error;
+        final last12Color = last12Return >= 0 ? colorScheme.tertiary : colorScheme.error;
+        final lastMonthColor = (lastMonth?.rentabilidade ?? 0) >= 0 ? colorScheme.tertiary : colorScheme.error;
 
         final kpiCards = Column(
           children: [
@@ -2158,7 +2291,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text('Total', style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   Text(
                     pct(totalReturn),
@@ -2167,7 +2300,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '${(totalReturn - totalCdi).toStringAsFixed(2).replaceAll('.', ',')}% ${totalReturn >= totalCdi ? 'acima' : 'abaixo'} do CDI',
-                    style: const TextStyle(color: Color(0xFF64748B)),
+                    style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -2177,7 +2310,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Últimos 12 meses', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    'Últimos 12 meses',
+                    style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     pct(last12Return),
@@ -2186,7 +2322,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '${(last12Return - last12Cdi).toStringAsFixed(2).replaceAll('.', ',')}% ${last12Return >= last12Cdi ? 'acima' : 'abaixo'} do CDI',
-                    style: const TextStyle(color: Color(0xFF64748B)),
+                    style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -2196,7 +2332,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Último mês', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    'Último mês',
+                    style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     pct(lastMonth?.rentabilidade ?? 0),
@@ -2205,7 +2344,7 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '${((lastMonth?.rentabilidade ?? 0) - (lastMonth?.cdi ?? 0)).toStringAsFixed(2).replaceAll('.', ',')}% ${(lastMonth?.rentabilidade ?? 0) >= (lastMonth?.cdi ?? 0) ? 'acima' : 'abaixo'} do CDI',
-                    style: const TextStyle(color: Color(0xFF64748B)),
+                    style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -2219,7 +2358,10 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
             children: [
               Row(
                 children: [
-                  const Text('Rentabilidade comparada com índices', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Rentabilidade comparada com índices',
+                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const Spacer(),
                   _filterPill(_rentabilidadeRange, leading: Icons.calendar_month_outlined),
                   const SizedBox(width: 8),
@@ -2230,15 +2372,15 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
               Wrap(
                 spacing: 12,
                 runSpacing: 6,
-                children: const [
-                  _LegendDot(color: Color(0xFF4C6FFF), label: 'Rentabilidade'),
-                  _LegendDot(color: Color(0xFFF59E0B), label: 'CDI'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'IPCA'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'IFIX'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'IBOV'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'SMLL'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'IDIV'),
-                  _LegendDot(color: Color(0xFF94A3B8), label: 'IVVB11'),
+                children: [
+                  _LegendDot(color: colorScheme.primary, label: 'Rentabilidade'),
+                  _LegendDot(color: colorScheme.secondary, label: 'CDI'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'IPCA'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'IFIX'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'IBOV'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'SMLL'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'IDIV'),
+                  _LegendDot(color: colorScheme.onSurfaceVariant, label: 'IVVB11'),
                 ],
               ),
               const SizedBox(height: 12),
@@ -2607,6 +2749,7 @@ class _AssetSearchFieldState extends State<_AssetSearchField> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2632,9 +2775,9 @@ class _AssetSearchFieldState extends State<_AssetSearchField> {
           Container(
             constraints: const BoxConstraints(maxHeight: 180),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: ListView.builder(
               shrinkWrap: true,
