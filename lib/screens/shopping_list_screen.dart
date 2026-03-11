@@ -23,7 +23,7 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
     thousandSeparator: '.',
     leftSymbol: 'R\$ ',
   );
-
+//departamento x itens
   final Map<String, List<String>> _catalogoPorDepartamento = const {
     'Mercearia': [
       'Arroz',
