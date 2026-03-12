@@ -1,5 +1,6 @@
 import 'package:financas_inteligentes/models/transaction_model.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
+import 'package:financas_inteligentes/widgets/theme_mode_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:intl/intl.dart';
@@ -455,6 +456,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
                     return Column(
                       children: [
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: ThemeModeToggle(compact: true),
+                        ),
+                        const SizedBox(height: 8),
                         _buildHeader(),
                         const SizedBox(height: 10),
                         _buildSummary(data),

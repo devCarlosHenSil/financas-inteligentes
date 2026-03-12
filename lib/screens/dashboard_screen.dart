@@ -5,6 +5,7 @@ import 'package:financas_inteligentes/screens/investments_screen.dart';
 import 'package:financas_inteligentes/screens/shopping_list_screen.dart';
 import 'package:financas_inteligentes/screens/transactions_screen.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
+import 'package:financas_inteligentes/widgets/theme_mode_toggle.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -575,6 +576,11 @@ class DashboardScreenState extends State<DashboardScreen> {
               children: [
                 if (_isLoading)
                   const LinearProgressIndicator(minHeight: 2),
+                const SizedBox(height: 8),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: ThemeModeToggle(compact: true),
+                ),
                 const SizedBox(height: 8),
                 _buildPremiumHeader(saldo),
                 const SizedBox(height: 10),

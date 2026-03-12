@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:financas_inteligentes/widgets/theme_mode_toggle.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -126,6 +127,11 @@ class LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: ThemeModeToggle(compact: true),
+                      ),
+                      const SizedBox(height: 10),
                       Icon(
                         Icons.account_balance_wallet_rounded,
                         color: colorScheme.onPrimaryContainer,

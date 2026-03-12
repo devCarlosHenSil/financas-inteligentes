@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
+import 'package:financas_inteligentes/theme/theme_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -16,7 +18,18 @@ Future<void> main() async {
     startupError = error.toString();
   }
 
-  runApp(MyApp(startupError: startupError));
+  final prefs = await SharedPreferences.getInstance();
+  final themeController = ThemeController(
+    prefs: prefs,
+    initialMode: ThemeController.resolveThemeMode(prefs),
+  );
+
+  runApp(
+    ThemeScope(
+      controller: themeController,
+      child: MyApp(startupError: startupError),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -27,12 +40,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasStartupError = startupError != null && startupError!.isNotEmpty;
+    final themeController = ThemeScope.of(context);
 
     return MaterialApp(
       title: 'Finanças Inteligentes',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: themeController.mode,
       home: hasStartupError
           ? _StartupErrorScreen(message: startupError!)
           : const LoginScreen(),
