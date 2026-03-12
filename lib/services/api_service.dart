@@ -233,33 +233,82 @@ class ApiService {
     return 0;
   }
 
-  Future<Map<String, double>> getRealtimeQuotes() async {
+  bool _isBrapiFeatureUnavailable(Map<String, dynamic> data) {
+    return data['error'] == true && data['code'] == 'FEATURE_NOT_AVAILABLE';
+  }
+
+  Future<Map<String, dynamic>?> _tryBrapiCurrency() async {
     try {
-      final fxData = await _getJsonMap(
+      final data = await _getJsonMap(
         _brapiProxyUri(
           'brapiCurrency',
           {'currency': 'USD-BRL,EUR-BRL'},
         ).toString(),
         allowProxy: false,
       );
+      if (_isBrapiFeatureUnavailable(data)) return null;
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
 
-      final cryptoData = await _getJsonMap(
+  Future<Map<String, dynamic>?> _tryBrapiCrypto() async {
+    try {
+      final data = await _getJsonMap(
         _brapiProxyUri(
           'brapiCrypto',
           {'coin': 'BTC,ETH', 'currency': 'BRL'},
         ).toString(),
         allowProxy: false,
       );
-
-      return {
-        'USD': _pickCurrencyBid(fxData, from: 'USD', to: 'BRL'),
-        'EUR': _pickCurrencyBid(fxData, from: 'EUR', to: 'BRL'),
-        'BTC': _pickCryptoPrice(cryptoData, 'BTC'),
-        'ETH': _pickCryptoPrice(cryptoData, 'ETH'),
-      };
+      if (_isBrapiFeatureUnavailable(data)) return null;
+      return data;
     } catch (_) {
-      return {'USD': 0, 'EUR': 0, 'BTC': 0, 'ETH': 0};
+      return null;
     }
+  }
+
+  Future<Map<String, double>> getRealtimeQuotes() async {
+    final fxData = await _tryBrapiCurrency();
+    final cryptoData = await _tryBrapiCrypto();
+
+    double usd = 0;
+    double eur = 0;
+    double btc = 0;
+    double eth = 0;
+
+    if (fxData != null) {
+      usd = _pickCurrencyBid(fxData, from: 'USD', to: 'BRL');
+      eur = _pickCurrencyBid(fxData, from: 'EUR', to: 'BRL');
+    } else {
+      try {
+        final fallbackFx = await _getJsonMap(
+          'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL',
+        );
+        usd = _toDouble(fallbackFx['USDBRL']?['bid']);
+        eur = _toDouble(fallbackFx['EURBRL']?['bid']);
+      } catch (_) {
+        // Keep as zero if both sources fail.
+      }
+    }
+
+    if (cryptoData != null) {
+      btc = _pickCryptoPrice(cryptoData, 'BTC');
+      eth = _pickCryptoPrice(cryptoData, 'ETH');
+    } else {
+      try {
+        final fallbackCrypto = await _getJsonMap(
+          'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=brl',
+        );
+        btc = _toDouble(fallbackCrypto['bitcoin']?['brl']);
+        eth = _toDouble(fallbackCrypto['ethereum']?['brl']);
+      } catch (_) {
+        // Keep as zero if both sources fail.
+      }
+    }
+
+    return {'USD': usd, 'EUR': eur, 'BTC': btc, 'ETH': eth};
   }
 
   Future<List<AssetOption>> searchAssetsByType({
