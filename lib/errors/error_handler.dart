@@ -2,15 +2,63 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:financas_inteligentes/errors/app_error.dart';
 
+// ── ErrorHandler ──────────────────────────────────────────────────────────────
+
+/// Singleton global de tratamento de erros do Finanças Inteligentes.
+///
+/// ## Responsabilidades
+///
+/// 1. **Classificar** exceções em [AppError] tipados.
+/// 2. **Logar** erros técnicos em modo debug.
+/// 3. **Relatar** erros críticos (preparado para Firebase Crashlytics).
+/// 4. **Exibir** feedback ao usuário via SnackBar ou Dialog.
+/// 5. **Capturar** erros globais do Flutter (zona não capturada).
+///
+/// ## Configuração em main.dart
+///
+/// ```dart
+/// void main() {
+///   ErrorHandler.instance.initialize();  // registra handlers globais
+///   runApp(...);
+/// }
+/// ```
+///
+/// ## Uso nos providers
+///
+/// ```dart
+/// // Antes (antipadrão):
+/// catch (e) { _error = e.toString(); }
+///
+/// // Depois:
+/// catch (e, st) { _appError = ErrorHandler.instance.handle(e, st); }
+/// ```
+///
+/// ## Exibição na UI
+///
+/// ```dart
+/// ErrorHandler.instance.showSnackBar(context, error);
+/// ErrorHandler.instance.showDialog(context, error);
+/// ```
 class ErrorHandler {
   ErrorHandler._();
 
   static final ErrorHandler instance = ErrorHandler._();
 
+  // ── Callbacks extensíveis ──────────────────────────────────────────────────
+
+  /// Callback para reportar erros críticos (ex.: Firebase Crashlytics).
+  /// Configure em main.dart se necessário.
   ValueChanged<AppError>? onCriticalError;
+
+  /// Callback para log customizado (ex.: analytics, Sentry).
   ValueChanged<AppError>? onErrorLogged;
 
+  // ── Inicialização global ───────────────────────────────────────────────────
+
+  /// Registra os handlers globais do Flutter.
+  /// Deve ser chamado **antes** de [runApp].
   void initialize() {
+    // Erros síncronos não capturados no widget tree
     FlutterError.onError = (FlutterErrorDetails details) {
       final error = AppError(
         type: AppErrorType.unknown,
@@ -23,32 +71,58 @@ class ErrorHandler {
       _report(error);
     };
 
+    // Erros assíncronos fora da zona Flutter (PlatformDispatcher)
     PlatformDispatcher.instance.onError = (error, stack) {
       final appError = AppError.from(error, stack);
       _log(appError);
       _report(appError);
-      return true;
+      return true; // marca como tratado
     };
   }
 
+  // ── Método principal ───────────────────────────────────────────────────────
+
+  /// Converte qualquer exceção em [AppError], loga e retorna.
+  ///
+  /// Use nos blocos `catch` dos providers:
+  /// ```dart
+  /// catch (e, st) {
+  ///   _appError = ErrorHandler.instance.handle(e, st);
+  ///   notifyListeners();
+  /// }
+  /// ```
   AppError handle(Object error, [StackTrace? stackTrace]) {
     final appError = AppError.from(error, stackTrace);
     _log(appError);
     return appError;
   }
 
+  /// Cria e loga um erro de validação.
   AppError validation(String message) {
     final error = AppError.validation(message);
     _log(error);
     return error;
   }
 
+  /// Cria e loga um erro de negócio.
   AppError business(String message) {
     final error = AppError.business(message);
     _log(error);
     return error;
   }
 
+  // ── UI helpers ─────────────────────────────────────────────────────────────
+
+  /// Exibe um [SnackBar] com a mensagem amigável do erro.
+  ///
+  /// - Erros de rede/autenticação → ação "Tentar novamente" opcional.
+  /// - Erros de validação → sem ação (apenas feedback).
+  ///
+  /// ```dart
+  /// if (_appError != null) {
+  ///   ErrorHandler.instance.showSnackBar(context, _appError!);
+  /// }
+  /// ```
   void showSnackBar(
     BuildContext context,
     AppError error, {
@@ -62,11 +136,17 @@ class ErrorHandler {
         SnackBar(
           content: Row(
             children: [
-              Icon(_iconForType(error.type), color: Colors.white, size: 18),
+              Icon(
+                _iconForType(error.type),
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(error.userMessage,
-                    style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  error.userMessage,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -82,11 +162,15 @@ class ErrorHandler {
                 )
               : null,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
   }
 
+  /// Exibe um [AlertDialog] com detalhes do erro.
+  /// Útil para erros críticos que exigem ação do usuário.
   Future<void> showDialog(
     BuildContext context,
     AppError error, {
@@ -130,6 +214,8 @@ class ErrorHandler {
     );
   }
 
+  // ── Log e report ───────────────────────────────────────────────────────────
+
   void _log(AppError error) {
     if (kDebugMode) {
       debugPrint('┌─ [ErrorHandler] ${error.type.name.toUpperCase()} ─────────────');
@@ -143,55 +229,124 @@ class ErrorHandler {
   }
 
   void _report(AppError error) {
+    // Erros de validação e negócio não são críticos — não reportar.
     if (error.isValidation || error.isBusiness) return;
     onCriticalError?.call(error);
+
+    // TODO: descomentar quando Firebase Crashlytics estiver configurado:
+    // FirebaseCrashlytics.instance.recordError(
+    //   error.originalException ?? error.technicalMessage,
+    //   error.stackTrace,
+    //   reason: error.userMessage,
+    // );
   }
+
+  // ── Helpers de estilo ──────────────────────────────────────────────────────
 
   IconData _iconForType(AppErrorType type) {
     switch (type) {
-      case AppErrorType.network:    return Icons.wifi_off_outlined;
-      case AppErrorType.auth:       return Icons.lock_outline;
-      case AppErrorType.firestore:  return Icons.cloud_off_outlined;
-      case AppErrorType.validation: return Icons.info_outline;
-      case AppErrorType.business:   return Icons.warning_amber_outlined;
-      case AppErrorType.unknown:    return Icons.error_outline;
+      case AppErrorType.network:
+        return Icons.wifi_off_outlined;
+      case AppErrorType.auth:
+        return Icons.lock_outline;
+      case AppErrorType.firestore:
+        return Icons.cloud_off_outlined;
+      case AppErrorType.validation:
+        return Icons.info_outline;
+      case AppErrorType.business:
+        return Icons.warning_amber_outlined;
+      case AppErrorType.unknown:
+        return Icons.error_outline;
     }
   }
 
   Color _colorForType(AppErrorType type) {
     switch (type) {
-      case AppErrorType.network:    return Colors.orange.shade700;
-      case AppErrorType.auth:       return Colors.red.shade700;
-      case AppErrorType.firestore:  return Colors.deepOrange.shade700;
-      case AppErrorType.validation: return Colors.blueGrey.shade700;
-      case AppErrorType.business:   return Colors.amber.shade800;
-      case AppErrorType.unknown:    return Colors.red.shade900;
+      case AppErrorType.network:
+        return Colors.orange.shade700;
+      case AppErrorType.auth:
+        return Colors.red.shade700;
+      case AppErrorType.firestore:
+        return Colors.deepOrange.shade700;
+      case AppErrorType.validation:
+        return Colors.blueGrey.shade700;
+      case AppErrorType.business:
+        return Colors.amber.shade800;
+      case AppErrorType.unknown:
+        return Colors.red.shade900;
     }
   }
 
   String _titleForType(AppErrorType type) {
     switch (type) {
-      case AppErrorType.network:    return 'Sem conexão';
-      case AppErrorType.auth:       return 'Erro de autenticação';
-      case AppErrorType.firestore:  return 'Erro no banco de dados';
-      case AppErrorType.validation: return 'Atenção';
-      case AppErrorType.business:   return 'Aviso';
-      case AppErrorType.unknown:    return 'Erro inesperado';
+      case AppErrorType.network:
+        return 'Sem conexão';
+      case AppErrorType.auth:
+        return 'Erro de autenticação';
+      case AppErrorType.firestore:
+        return 'Erro no banco de dados';
+      case AppErrorType.validation:
+        return 'Atenção';
+      case AppErrorType.business:
+        return 'Aviso';
+      case AppErrorType.unknown:
+        return 'Erro inesperado';
     }
   }
 }
 
+// ── Extensão de conveniência nos providers ────────────────────────────────────
+
+/// Mixin que adiciona gerenciamento de [AppError] padronizado a qualquer
+/// [ChangeNotifier].
+///
+/// ## Uso
+///
+/// ```dart
+/// class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
+///
+///   Future<bool> addTransaction(TransactionModel t) async {
+///     return await runSafe(() async {
+///       await _service.addTransaction(t);
+///       return true;
+///     });
+///   }
+/// }
+/// ```
 mixin ErrorHandlerMixin on ChangeNotifier {
   AppError? _appError;
 
-  AppError? get appError => _appError;
-  String?   get error    => _appError?.userMessage;
+  /// Define o erro atual. Use quando precisar atribuir fora do arquivo do mixin
+  /// (ex.: dentro de callbacks .listen() em outros arquivos).
+  @protected
+  void setAppError(AppError? error) {
+    _appError = error;
+  }
 
+  /// Erro atual do provider (null = sem erro).
+  AppError? get appError => _appError;
+
+  /// Texto do erro para compatibilidade com código legado que usa `error`.
+  String? get error => _appError?.userMessage;
+
+  /// Limpa o erro atual.
   void clearError() {
     _appError = null;
     notifyListeners();
   }
 
+  /// Executa [fn] dentro de try/catch padronizado.
+  /// Em caso de erro, popula [appError] e retorna o valor padrão.
+  ///
+  /// ```dart
+  /// final ok = await runSafe<bool>(
+  ///   () async {
+  ///     await _service.addTransaction(t);
+  ///     return true;
+  ///   },
+  ///   fallback: false,
+  /// );
+  /// ```
   Future<T> runSafe<T>(
     Future<T> Function() fn, {
     required T fallback,
@@ -207,6 +362,7 @@ mixin ErrorHandlerMixin on ChangeNotifier {
     }
   }
 
+  /// Versão sem retorno — para operações void (delete, update, etc.).
   Future<void> runSafeVoid(
     Future<void> Function() fn, {
     bool notify = true,

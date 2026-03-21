@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:financas_inteligentes/errors/error_handler.dart';
 import 'package:financas_inteligentes/models/investment_model.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
@@ -8,23 +9,16 @@ import 'package:financas_inteligentes/services/market_cache_service.dart';
 /// Estado centralizado da tela de Investimentos.
 ///
 /// ## Estratégia de cache
+///   1. Carrega cache local imediatamente (UI exibe dados offline).
+///   2. Se TTL expirado → atualiza em background.
+///   3. Timer 60 s verifica TTL antes de chamar a API.
 ///
-/// Na inicialização:
-///   1. Carrega dados do cache local (SharedPreferences) imediatamente →
-///      UI exibe dados offline sem esperar rede.
-///   2. Verifica TTL: cotações 5 min / tickers 10 min.
-///   3. Se expirado → atualiza em background sem bloquear a UI.
-///
-/// No refresh manual ([refreshMarketData]):
-///   1. Invalida todo o cache.
-///   2. Busca dados frescos na API.
-///   3. Grava no cache e notifica listeners.
-///
-/// Timer 60 s verifica TTL antes de chamar a API — evita requisições desnecessárias.
-class InvestmentProvider extends ChangeNotifier {
-  final FirestoreService    _firestoreService;
-  final ApiService          _apiService;
-  final MarketCacheService  _cache;
+/// ## Tratamento de erros
+///   Usa [ErrorHandlerMixin]: `appError` tipado, `runSafe`/`runSafeVoid`.
+class InvestmentProvider extends ChangeNotifier with ErrorHandlerMixin {
+  final FirestoreService   _firestoreService;
+  final ApiService         _apiService;
+  final MarketCacheService _cache;
 
   InvestmentProvider(
     this._firestoreService,
@@ -44,7 +38,6 @@ class InvestmentProvider extends ChangeNotifier {
   StreamSubscription<List<InvestmentModel>>? _subscription;
   List<InvestmentModel> _investments       = [];
   bool                  _isLoadingInvestments = true;
-  String?               _error;
 
   // ── Estado mercado ────────────────────────────────────────────────────────
 
@@ -75,7 +68,6 @@ class InvestmentProvider extends ChangeNotifier {
 
   List<InvestmentModel> get investments          => _investments;
   bool                  get isLoadingInvestments => _isLoadingInvestments;
-  String?               get error                => _error;
 
   double get patrimonio => _investments.fold(0.0, (s, inv) => s + inv.valorInvestido);
   double get totalInvestido => _investments
@@ -115,11 +107,11 @@ class InvestmentProvider extends ChangeNotifier {
       (data) {
         _investments          = data;
         _isLoadingInvestments = false;
-        _error                = null;
+        setAppError(null);
         notifyListeners();
       },
-      onError: (e) {
-        _error                = e.toString();
+      onError: (e, StackTrace st) {
+        setAppError(ErrorHandler.instance.handle(e, st));
         _isLoadingInvestments = false;
         notifyListeners();
       },
@@ -132,41 +124,34 @@ class InvestmentProvider extends ChangeNotifier {
 
   Future<void> _initMarketData() async {
     await _loadFromCache();
-
-    final qInfo = await _cache.quotesInfo();
-    final tInfo = await _cache.etfsInfo();
-    _quotesInfo  = qInfo;
-    _tickersInfo = tInfo;
-
-    if (!qInfo.isValid || !tInfo.isValid) {
+    _quotesInfo  = await _cache.quotesInfo();
+    _tickersInfo = await _cache.etfsInfo();
+    if (!_quotesInfo.isValid || !_tickersInfo.isValid) {
       await _fetchFromNetwork();
     }
   }
 
   Future<void> _loadFromCache() async {
-    final q  = await _cache.loadQuotes();
-    final e  = await _cache.loadEtfs();
-    final f  = await _cache.loadFiis();
-    final s  = await _cache.loadStocks();
+    final q = await _cache.loadQuotes();
+    final e = await _cache.loadEtfs();
+    final f = await _cache.loadFiis();
+    final s = await _cache.loadStocks();
 
     if (q != null) _quotes    = q;
     if (e != null) _topEtfs   = e;
     if (f != null) _topFiis   = f;
     if (s != null) _topStocks = s;
 
-    final hasCache = q != null || e != null || f != null || s != null;
-    if (hasCache) {
+    if (q != null || e != null || f != null || s != null) {
       _loadingMarket = false;
       notifyListeners();
     }
   }
 
-  // ── Auto-refresh (Timer 60 s) ─────────────────────────────────────────────
-
   Future<void> _autoRefresh() async {
-    final quotesExpired  = !(await _cache.quotesInfo()).isValid;
-    final tickersExpired = !(await _cache.etfsInfo()).isValid;
-    if (quotesExpired || tickersExpired) await _fetchFromNetwork();
+    final qExp = !(await _cache.quotesInfo()).isValid;
+    final tExp = !(await _cache.etfsInfo()).isValid;
+    if (qExp || tExp) await _fetchFromNetwork();
   }
 
   // ── Refresh público ───────────────────────────────────────────────────────
@@ -186,6 +171,7 @@ class InvestmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      setAppError(null);
       final results = await Future.wait([
         _apiService.getRealtimeQuotes(),
         _apiService.getTopEtfs(),
@@ -208,8 +194,9 @@ class InvestmentProvider extends ChangeNotifier {
 
       _quotesInfo  = await _cache.quotesInfo();
       _tickersInfo = await _cache.etfsInfo();
-    } catch (e) {
-      _error = 'Falha ao atualizar mercado: $e';
+    } catch (e, st) {
+      // Erro de rede ao buscar mercado: mantém dados do cache
+      setAppError(ErrorHandler.instance.handle(e, st));
     } finally {
       _loadingMarket       = false;
       _fetchingFromNetwork = false;
@@ -220,21 +207,11 @@ class InvestmentProvider extends ChangeNotifier {
   // ── CRUD investimentos ────────────────────────────────────────────────────
 
   Future<void> addInvestment(InvestmentModel inv) async {
-    try {
-      await _firestoreService.addInvestment(inv);
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-    }
+    await runSafeVoid(() => _firestoreService.addInvestment(inv));
   }
 
   Future<void> deleteInvestment(String id) async {
-    try {
-      await _firestoreService.deleteInvestment(id);
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-    }
+    await runSafeVoid(() => _firestoreService.deleteInvestment(id));
   }
 
   // ── Setters filtros ───────────────────────────────────────────────────────

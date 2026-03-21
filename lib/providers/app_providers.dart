@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:financas_inteligentes/providers/auth_provider.dart';
-import 'package:financas_inteligentes/providers/transaction_provider.dart';
+import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/investment_provider.dart';
 import 'package:financas_inteligentes/providers/shopping_provider.dart';
-import 'package:financas_inteligentes/services/firestore_service.dart';
+import 'package:financas_inteligentes/providers/transaction_provider.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
+import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:financas_inteligentes/services/market_cache_service.dart';
 
 /// Configura a árvore de providers do app.
 ///
-/// Hierarquia:
-///   AuthProvider
-///   FirestoreService
-///   ApiService
-///   MarketCacheService          ← cache local de mercado
-///   TransactionProvider         ← depende de FirestoreService
-///   InvestmentProvider          ← depende de FirestoreService + ApiService + MarketCacheService
-///   ShoppingProvider            ← depende de FirestoreService
+/// ## Hierarquia
+///
+/// ```
+/// AuthProvider
+/// FirestoreService
+/// ApiService
+/// MarketCacheService
+/// TransactionProvider   ← depende de FirestoreService
+/// InvestmentProvider    ← depende de FirestoreService + ApiService + MarketCacheService
+/// ShoppingProvider      ← depende de FirestoreService
+/// GoalProvider          ← depende de FirestoreService
+/// ```
 class AppProviders extends StatelessWidget {
   const AppProviders({super.key, required this.child});
 
@@ -27,22 +32,23 @@ class AppProviders extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // ── Auth ──────────────────────────────────────────────────────────
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
         ),
 
+        // ── Infraestrutura ────────────────────────────────────────────────
         Provider<FirestoreService>(
           create: (_) => FirestoreService(),
         ),
-
         Provider<ApiService>(
           create: (_) => ApiService(),
         ),
-
         Provider<MarketCacheService>(
           create: (_) => MarketCacheService(),
         ),
 
+        // ── Domínio ───────────────────────────────────────────────────────
         ChangeNotifierProxyProvider<FirestoreService, TransactionProvider>(
           create: (ctx) => TransactionProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
@@ -67,6 +73,13 @@ class AppProviders extends StatelessWidget {
           create: (ctx) => ShoppingProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
               previous ?? ShoppingProvider(service),
+        ),
+
+        // GoalProvider — metas financeiras
+        ChangeNotifierProxyProvider<FirestoreService, GoalProvider>(
+          create: (ctx) => GoalProvider(ctx.read<FirestoreService>()),
+          update: (ctx, service, previous) =>
+              previous ?? GoalProvider(service),
         ),
       ],
       child: child,

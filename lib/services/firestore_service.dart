@@ -1,26 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:financas_inteligentes/models/transaction_model.dart';
+import 'package:financas_inteligentes/models/goal_model.dart';
 import 'package:financas_inteligentes/models/investment_model.dart';
-import 'package:financas_inteligentes/models/shopping_item_model.dart';
 import 'package:financas_inteligentes/models/provento_model.dart';
 import 'package:financas_inteligentes/models/rentabilidade_model.dart';
+import 'package:financas_inteligentes/models/shopping_item_model.dart';
+import 'package:financas_inteligentes/models/transaction_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore db = FirebaseFirestore.instance;
 
   // ── getter dinâmico — avaliado a cada chamada ─────────────────────────────
-  // BUG CORRIGIDO: antes era `final String? userId = ...` (capturado uma única
-  // vez no construtor). Após logout/login, o campo ficava com o UID antigo,
-  // apontando para a coleção do usuário anterior.
-  // Agora lança StateError claro se chamado sem sessão ativa.
   String get _uid {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('Nenhum usuário autenticado.');
     return uid;
   }
 
-  // Atalho para a coleção raiz do usuário corrente
   CollectionReference<Map<String, dynamic>> _col(String path) =>
       db.collection('usuarios/$_uid/$path');
 
@@ -53,7 +49,7 @@ class FirestoreService {
             t.tipo == 'entrada' &&
             t.data.month == mes.month &&
             t.data.year == mes.year)
-        .fold<double>(0.0, (acc, t) => acc + t.valor);
+        .fold<double>(0.0, (double acc, t) => acc + t.valor);
   }
 
   Future<double> getTotalSaidas(DateTime mes) async {
@@ -64,7 +60,7 @@ class FirestoreService {
             t.tipo == 'saida' &&
             t.data.month == mes.month &&
             t.data.year == mes.year)
-        .fold<double>(0.0, (acc, t) => acc + t.valor);
+        .fold<double>(0.0, (double acc, t) => acc + t.valor);
   }
 
   Future<double> getTotalSuperfluos(DateTime mes) async {
@@ -75,7 +71,7 @@ class FirestoreService {
             t.superfluo &&
             t.data.month == mes.month &&
             t.data.year == mes.year)
-        .fold<double>(0.0, (acc, t) => acc + t.valor);
+        .fold<double>(0.0, (double acc, t) => acc + t.valor);
   }
 
   // ── Investimentos ─────────────────────────────────────────────────────────
@@ -190,5 +186,29 @@ class FirestoreService {
             i.data.year == mes.year);
     if (items.isEmpty) return 0.0;
     return items.fold<double>(0.0, (acc, i) => acc + i.preco) / items.length;
+  }
+
+  // ── Metas Financeiras ─────────────────────────────────────────────────────
+
+  Future<void> addGoal(GoalModel goal) async {
+    await _col('metas').add(goal.toMap());
+  }
+
+  Future<void> updateGoal(String id, GoalModel goal) async {
+    await _col('metas').doc(id).update(goal.toMap());
+  }
+
+  Future<void> deleteGoal(String id) async {
+    await _col('metas').doc(id).delete();
+  }
+
+  Stream<List<GoalModel>> getGoals() {
+    return _col('metas')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs
+                .map((doc) => GoalModel.fromMap(doc.data(), doc.id))
+                .toList());
   }
 }
