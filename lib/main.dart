@@ -2,15 +2,25 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:financas_inteligentes/providers/app_providers.dart';
 import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
+import 'package:financas_inteligentes/theme/theme_controller.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializa prefs e tema antes de qualquer widget
+  final prefs = await SharedPreferences.getInstance();
+  final initialThemeMode = ThemeController.resolveThemeMode(prefs);
+  final themeController = ThemeController(
+    prefs: prefs,
+    initialMode: initialThemeMode,
+  );
 
   String? startupError;
   try {
@@ -21,42 +31,56 @@ Future<void> main() async {
   }
 
   runApp(
-    AppProviders(
-      child: MyApp(startupError: startupError),
+    // ThemeScope envolve tudo — ThemeModeToggle precisa encontrá-lo na árvore
+    ThemeScope(
+      controller: themeController,
+      child: AppProviders(
+        child: MyApp(
+          startupError: startupError,
+          themeController: themeController,
+        ),
+      ),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.startupError});
+  const MyApp({
+    super.key,
+    this.startupError,
+    required this.themeController,
+  });
 
   final String? startupError;
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
     final hasStartupError = startupError != null && startupError!.isNotEmpty;
 
-    return MaterialApp(
-      title: 'Finanças Inteligentes',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
-      // Roteamento reativo baseado no AuthProvider —
-      // quando o usuário desloga, a home volta automaticamente para LoginScreen
-      home: hasStartupError
-          ? _StartupErrorScreen(message: startupError!)
-          : const _AuthGate(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/dashboard': (context) => const DashboardScreen(),
+    // Escuta o ThemeController para rebuildar só o MaterialApp quando o tema muda
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Finanças Inteligentes',
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: themeController.mode,
+          home: hasStartupError
+              ? _StartupErrorScreen(message: startupError!)
+              : const _AuthGate(),
+          routes: {
+            '/login': (context) => const LoginScreen(),
+            '/dashboard': (context) => const DashboardScreen(),
+          },
+        );
       },
     );
   }
 }
 
 /// Roteador reativo: observa o AuthProvider e decide qual tela exibir.
-/// Substitui a navegação imperativa com pushReplacementNamed que existia
-/// em cada tela — agora o app reage automaticamente ao estado de sessão.
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 
