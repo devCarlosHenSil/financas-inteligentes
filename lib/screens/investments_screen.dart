@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:financas_inteligentes/services/import_service.dart';
+import 'package:financas_inteligentes/widgets/theme_mode_toggle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2522,6 +2523,8 @@ class InvestmentsScreenState extends State<InvestmentsScreen> {
                             ),
                           ),
                         ),
+                        const ThemeModeToggle(compact: true),
+                        const SizedBox(width: 8),
                         IconButton(
                           onPressed: _refreshMarketData,
                           icon: const Icon(Icons.refresh),
