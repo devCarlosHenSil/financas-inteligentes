@@ -1,95 +1,83 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:financas_inteligentes/firebase_options.dart';
 import 'package:financas_inteligentes/providers/app_providers.dart';
 import 'package:financas_inteligentes/providers/auth_provider.dart';
-import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
+import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
-import 'package:financas_inteligentes/theme/theme_controller.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa prefs e tema antes de qualquer widget
-  final prefs = await SharedPreferences.getInstance();
-  final initialThemeMode = ThemeController.resolveThemeMode(prefs);
-  final themeController = ThemeController(
-    prefs: prefs,
-    initialMode: initialThemeMode,
-  );
-
   String? startupError;
   try {
     await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (error) {
     startupError = error.toString();
   }
 
   runApp(
-    // ThemeScope envolve tudo — ThemeModeToggle precisa encontrá-lo na árvore
-    ThemeScope(
-      controller: themeController,
-      child: AppProviders(
-        child: MyApp(
-          startupError: startupError,
-          themeController: themeController,
-        ),
-      ),
+    AppProviders(
+      child: MyApp(startupError: startupError),
     ),
   );
 }
 
+// ── MyApp ──────────────────────────────────────────────────────────────────────
+
 class MyApp extends StatelessWidget {
-  const MyApp({
-    super.key,
-    this.startupError,
-    required this.themeController,
-  });
+  const MyApp({super.key, this.startupError});
 
   final String? startupError;
-  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
     final hasStartupError = startupError != null && startupError!.isNotEmpty;
 
-    // Escuta o ThemeController para rebuildar só o MaterialApp quando o tema muda
-    return ListenableBuilder(
-      listenable: themeController,
-      builder: (context, _) {
-        return MaterialApp(
-          title: 'Finanças Inteligentes',
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          themeMode: themeController.mode,
-          home: hasStartupError
-              ? _StartupErrorScreen(message: startupError!)
-              : const _AuthGate(),
-          routes: {
-            '/login': (context) => const LoginScreen(),
-            '/dashboard': (context) => const DashboardScreen(),
-          },
-        );
+    return MaterialApp(
+      title: 'Finanças Inteligentes',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
+      home: hasStartupError
+          ? _StartupErrorScreen(message: startupError!)
+          : const _AuthGate(),
+      routes: {
+        '/login':     (context) => const LoginScreen(),
+        '/dashboard': (context) => const DashboardScreen(),
       },
     );
   }
 }
 
-/// Roteador reativo: observa o AuthProvider e decide qual tela exibir.
+// ── _AuthGate ──────────────────────────────────────────────────────────────────
+
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    return auth.isAuthenticated ? const DashboardScreen() : const LoginScreen();
+
+    if (auth.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return auth.isAuthenticated
+        ? const DashboardScreen()
+        : const LoginScreen();
   }
 }
+
+// ── _StartupErrorScreen ────────────────────────────────────────────────────────
 
 class _StartupErrorScreen extends StatelessWidget {
   const _StartupErrorScreen({required this.message});
@@ -132,8 +120,8 @@ class _StartupErrorScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Dica: se estiver rodando no Chrome corporativo/restrito, teste em outra rede '
-              'ou navegador sem bloqueio de CDN.',
+              'Dica: se estiver rodando no Chrome corporativo/restrito, '
+              'teste em outra rede ou navegador sem bloqueio de CDN.',
             ),
           ],
         ),

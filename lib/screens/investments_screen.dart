@@ -3,6 +3,7 @@ import 'package:financas_inteligentes/screens/investments/tabs/patrimonio_tab.da
 import 'package:financas_inteligentes/screens/investments/tabs/proventos_tab.dart';
 import 'package:financas_inteligentes/screens/investments/tabs/rentabilidade_tab.dart';
 import 'package:financas_inteligentes/screens/investments/tabs/resumo_tab.dart';
+import 'package:financas_inteligentes/screens/investments/widgets/cache_status_badge.dart';
 import 'package:financas_inteligentes/screens/investments/widgets/investment_launch_dialog.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
@@ -14,9 +15,9 @@ class InvestmentsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final inv = context.watch<InvestmentProvider>();
+    final inv         = context.watch<InvestmentProvider>();
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme   = Theme.of(context).textTheme;
 
     return DefaultTabController(
       length: 4,
@@ -25,7 +26,7 @@ class InvestmentsScreen extends StatelessWidget {
         body: SafeArea(
           child: Column(
             children: [
-              // ── AppBar manual ─────────────────────────────────────────
+              // ── AppBar ────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Row(
@@ -37,11 +38,8 @@ class InvestmentsScreen extends StatelessWidget {
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () =>
-                          context.read<InvestmentProvider>().refreshMarketData(),
-                      icon: const Icon(Icons.refresh),
-                    ),
+                    const CacheStatusBadge(),
+                    const MarketRefreshButton(),
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: () => showLaunchDialog(

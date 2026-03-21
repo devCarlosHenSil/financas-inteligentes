@@ -6,21 +6,18 @@ import 'package:financas_inteligentes/providers/investment_provider.dart';
 import 'package:financas_inteligentes/providers/shopping_provider.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
+import 'package:financas_inteligentes/services/market_cache_service.dart';
 
 /// Configura a árvore de providers do app.
 ///
-/// Uso em main.dart:
-/// ```dart
-/// runApp(AppProviders(child: MyApp()));
-/// ```
-///
 /// Hierarquia:
-///   AuthProvider         — sessão de usuário (singleton, vive toda a app)
-///   FirestoreService     — instância única, injetada nos providers filhos
-///   ApiService           — instância única, injetada no InvestmentProvider
-///   TransactionProvider  — depende de FirestoreService
-///   InvestmentProvider   — depende de FirestoreService + ApiService
-///   ShoppingProvider     — depende de FirestoreService
+///   AuthProvider
+///   FirestoreService
+///   ApiService
+///   MarketCacheService          ← cache local de mercado
+///   TransactionProvider         ← depende de FirestoreService
+///   InvestmentProvider          ← depende de FirestoreService + ApiService + MarketCacheService
+///   ShoppingProvider            ← depende de FirestoreService
 class AppProviders extends StatelessWidget {
   const AppProviders({super.key, required this.child});
 
@@ -30,12 +27,10 @@ class AppProviders extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Autenticação — criado primeiro pois outros providers dependem do userId
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
         ),
 
-        // Serviços (não são ChangeNotifier — usamos Provider puro)
         Provider<FirestoreService>(
           create: (_) => FirestoreService(),
         ),
@@ -44,29 +39,32 @@ class AppProviders extends StatelessWidget {
           create: (_) => ApiService(),
         ),
 
-        // Providers de domínio — recebem serviços via ProxyProvider
+        Provider<MarketCacheService>(
+          create: (_) => MarketCacheService(),
+        ),
+
         ChangeNotifierProxyProvider<FirestoreService, TransactionProvider>(
-          create: (ctx) => TransactionProvider(
-            ctx.read<FirestoreService>(),
-          ),
+          create: (ctx) => TransactionProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
               previous ?? TransactionProvider(service),
         ),
 
-        ChangeNotifierProxyProvider2<FirestoreService, ApiService,
+        ChangeNotifierProxyProvider3<
+            FirestoreService,
+            ApiService,
+            MarketCacheService,
             InvestmentProvider>(
           create: (ctx) => InvestmentProvider(
             ctx.read<FirestoreService>(),
             ctx.read<ApiService>(),
+            cache: ctx.read<MarketCacheService>(),
           ),
-          update: (ctx, firestoreService, apiService, previous) =>
-              previous ?? InvestmentProvider(firestoreService, apiService),
+          update: (ctx, fs, api, cache, previous) =>
+              previous ?? InvestmentProvider(fs, api, cache: cache),
         ),
 
         ChangeNotifierProxyProvider<FirestoreService, ShoppingProvider>(
-          create: (ctx) => ShoppingProvider(
-            ctx.read<FirestoreService>(),
-          ),
+          create: (ctx) => ShoppingProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
               previous ?? ShoppingProvider(service),
         ),
