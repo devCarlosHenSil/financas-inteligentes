@@ -7,143 +7,165 @@ import 'package:financas_inteligentes/models/provento_model.dart';
 import 'package:financas_inteligentes/models/rentabilidade_model.dart';
 
 class FirestoreService {
-  final FirebaseFirestore db = FirebaseFirestore.instance;
-  final String? userId = FirebaseAuth.instance.currentUser?.uid;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> addTransaction(TransactionModel trans) async {
-    await db.collection('usuarios/$userId/transacoes').add(trans.toMap());
+  // ── CORREÇÃO DO BUG: userId como getter dinâmico ─────────────────────────
+  // Antes: `final String? userId = FirebaseAuth.instance.currentUser?.uid`
+  // Problema: capturado uma única vez no construtor → após logout/login o
+  // ID ficava stale (apontando para o usuário anterior ou null).
+  // Agora: avaliado a cada chamada, sempre refletindo o usuário corrente.
+  String get _userId {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw StateError('Nenhum usuário autenticado.');
+    return uid;
   }
 
-  Future<void> updateTransaction(String id, TransactionModel trans) async {
-    await db.collection('usuarios/$userId/transacoes').doc(id).update(trans.toMap());
-  }
+  // ── Helpers internos ─────────────────────────────────────────────────────
 
-  Future<void> deleteTransaction(String id) async {
-    await db.collection('usuarios/$userId/transacoes').doc(id).delete();
-  }
+  CollectionReference<Map<String, dynamic>> _col(String path) =>
+      _db.collection('usuarios/$_userId/$path');
 
-  Stream<List<TransactionModel>> getTransactions() {
-    return db.collection('usuarios/$userId/transacoes').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => TransactionModel.fromMap(doc.data(), doc.id)).toList();
-    });
-  }
+  // ── Transações ───────────────────────────────────────────────────────────
+
+  Future<void> addTransaction(TransactionModel trans) async =>
+      _col('transacoes').add(trans.toMap());
+
+  Future<void> updateTransaction(String id, TransactionModel trans) async =>
+      _col('transacoes').doc(id).update(trans.toMap());
+
+  Future<void> deleteTransaction(String id) async =>
+      _col('transacoes').doc(id).delete();
+
+  Stream<List<TransactionModel>> getTransactions() =>
+      _col('transacoes').snapshots().map((s) =>
+          s.docs.map((d) => TransactionModel.fromMap(d.data(), d.id)).toList());
 
   Future<double> getTotalEntradas(DateTime mes) async {
-    final snapshot = await db.collection('usuarios/$userId/transacoes').get();
+    final snapshot = await _col('transacoes').get();
     return snapshot.docs
-        .map((doc) => TransactionModel.fromMap(doc.data(), doc.id))
-        .where((t) => t.tipo == 'entrada' && t.data.month == mes.month && t.data.year == mes.year)
+        .map((d) => TransactionModel.fromMap(d.data(), d.id))
+        .where((t) =>
+            t.tipo == 'entrada' &&
+            t.data.month == mes.month &&
+            t.data.year == mes.year)
         .fold<double>(0.0, (acc, t) => acc + t.valor);
   }
 
   Future<double> getTotalSaidas(DateTime mes) async {
-    final snapshot = await db.collection('usuarios/$userId/transacoes').get();
+    final snapshot = await _col('transacoes').get();
     return snapshot.docs
-        .map((doc) => TransactionModel.fromMap(doc.data(), doc.id))
-        .where((t) => t.tipo == 'saida' && t.data.month == mes.month && t.data.year == mes.year)
+        .map((d) => TransactionModel.fromMap(d.data(), d.id))
+        .where((t) =>
+            t.tipo == 'saida' &&
+            t.data.month == mes.month &&
+            t.data.year == mes.year)
         .fold<double>(0.0, (acc, t) => acc + t.valor);
   }
 
   Future<double> getTotalSuperfluos(DateTime mes) async {
-    final snapshot = await db.collection('usuarios/$userId/transacoes').get();
+    final snapshot = await _col('transacoes').get();
     return snapshot.docs
-        .map((doc) => TransactionModel.fromMap(doc.data(), doc.id))
-        .where((t) => t.superfluo && t.data.month == mes.month && t.data.year == mes.year)
+        .map((d) => TransactionModel.fromMap(d.data(), d.id))
+        .where((t) =>
+            t.superfluo &&
+            t.data.month == mes.month &&
+            t.data.year == mes.year)
         .fold<double>(0.0, (acc, t) => acc + t.valor);
   }
 
-  Future<void> addInvestment(InvestmentModel inv) async {
-    await db.collection('usuarios/$userId/investimentos').add(inv.toMap());
-  }
+  // ── Investimentos ─────────────────────────────────────────────────────────
 
+  Future<void> addInvestment(InvestmentModel inv) async =>
+      _col('investimentos').add(inv.toMap());
 
-  Future<void> deleteInvestment(String id) async {
-    await db.collection('usuarios/$userId/investimentos').doc(id).delete();
-  }
+  Future<void> deleteInvestment(String id) async =>
+      _col('investimentos').doc(id).delete();
 
-  Stream<List<InvestmentModel>> getInvestments() {
-    return db.collection('usuarios/$userId/investimentos').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => InvestmentModel.fromMap(doc.data(), doc.id)).toList();
-    });
-  }
+  Stream<List<InvestmentModel>> getInvestments() =>
+      _col('investimentos').snapshots().map((s) =>
+          s.docs.map((d) => InvestmentModel.fromMap(d.data(), d.id)).toList());
 
-  Future<void> addProvento(ProventoModel provento) async {
-    await db.collection('usuarios/$userId/proventos').add(provento.toMap());
-  }
+  // ── Proventos ─────────────────────────────────────────────────────────────
 
-  Future<void> deleteProvento(String id) async {
-    await db.collection('usuarios/$userId/proventos').doc(id).delete();
-  }
+  Future<void> addProvento(ProventoModel provento) async =>
+      _col('proventos').add(provento.toMap());
 
-  Stream<List<ProventoModel>> getProventos() {
-    return db.collection('usuarios/$userId/proventos').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => ProventoModel.fromMap(doc.data(), doc.id)).toList();
-    });
-  }
+  Future<void> deleteProvento(String id) async =>
+      _col('proventos').doc(id).delete();
+
+  Stream<List<ProventoModel>> getProventos() =>
+      _col('proventos').snapshots().map((s) =>
+          s.docs.map((d) => ProventoModel.fromMap(d.data(), d.id)).toList());
 
   Future<List<ProventoModel>> getProventosOnce() async {
-    final snapshot = await db.collection('usuarios/$userId/proventos').get();
-    return snapshot.docs.map((doc) => ProventoModel.fromMap(doc.data(), doc.id)).toList();
+    final s = await _col('proventos').get();
+    return s.docs.map((d) => ProventoModel.fromMap(d.data(), d.id)).toList();
   }
 
   Future<void> addProventosBatch(List<ProventoModel> items) async {
     if (items.isEmpty) return;
-    final batch = db.batch();
-    final col = db.collection('usuarios/$userId/proventos');
+    final batch = _db.batch();
+    final col = _col('proventos');
     for (final item in items) {
       batch.set(col.doc(), item.toMap());
     }
     await batch.commit();
   }
 
-  Future<void> addRentabilidade(RentabilidadeModel rentabilidade) async {
-    await db.collection('usuarios/$userId/rentabilidade').add(rentabilidade.toMap());
-  }
+  // ── Rentabilidade ─────────────────────────────────────────────────────────
 
-  Future<void> deleteRentabilidade(String id) async {
-    await db.collection('usuarios/$userId/rentabilidade').doc(id).delete();
-  }
+  Future<void> addRentabilidade(RentabilidadeModel r) async =>
+      _col('rentabilidade').add(r.toMap());
 
-  Stream<List<RentabilidadeModel>> getRentabilidade() {
-    return db.collection('usuarios/$userId/rentabilidade').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => RentabilidadeModel.fromMap(doc.data(), doc.id)).toList();
-    });
-  }
+  Future<void> deleteRentabilidade(String id) async =>
+      _col('rentabilidade').doc(id).delete();
+
+  Stream<List<RentabilidadeModel>> getRentabilidade() =>
+      _col('rentabilidade').snapshots().map((s) =>
+          s.docs
+              .map((d) => RentabilidadeModel.fromMap(d.data(), d.id))
+              .toList());
 
   Future<List<RentabilidadeModel>> getRentabilidadeOnce() async {
-    final snapshot = await db.collection('usuarios/$userId/rentabilidade').get();
-    return snapshot.docs.map((doc) => RentabilidadeModel.fromMap(doc.data(), doc.id)).toList();
+    final s = await _col('rentabilidade').get();
+    return s.docs
+        .map((d) => RentabilidadeModel.fromMap(d.data(), d.id))
+        .toList();
   }
 
   Future<void> addRentabilidadeBatch(List<RentabilidadeModel> items) async {
     if (items.isEmpty) return;
-    final batch = db.batch();
-    final col = db.collection('usuarios/$userId/rentabilidade');
+    final batch = _db.batch();
+    final col = _col('rentabilidade');
     for (final item in items) {
       batch.set(col.doc(), item.toMap());
     }
     await batch.commit();
   }
 
-  Future<void> addShoppingItem(ShoppingItemModel item) async {
-    await db.collection('usuarios/$userId/lista_compras').add(item.toMap());
-  }
+  // ── Lista de Compras ──────────────────────────────────────────────────────
 
-  Future<void> removeShoppingItem(String id) async {
-    await db.collection('usuarios/$userId/lista_compras').doc(id).delete();
-  }
+  Future<void> addShoppingItem(ShoppingItemModel item) async =>
+      _col('lista_compras').add(item.toMap());
 
-  Stream<List<ShoppingItemModel>> getShoppingItems() {
-    return db.collection('usuarios/$userId/lista_compras').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => ShoppingItemModel.fromMap(doc.data(), doc.id)).toList();
-    });
-  }
+  Future<void> removeShoppingItem(String id) async =>
+      _col('lista_compras').doc(id).delete();
+
+  Stream<List<ShoppingItemModel>> getShoppingItems() =>
+      _col('lista_compras').snapshots().map((s) =>
+          s.docs
+              .map((d) => ShoppingItemModel.fromMap(d.data(), d.id))
+              .toList());
 
   Future<double> getAveragePrice(String nome, DateTime mes) async {
-    final snapshot = await db.collection('usuarios/$userId/lista_compras').get();
-    final items = snapshot.docs
-        .map((doc) => ShoppingItemModel.fromMap(doc.data(), doc.id))
-        .where((i) => i.nome == nome && i.data.month == mes.month && i.data.year == mes.year);
+    final s = await _col('lista_compras').get();
+    final items = s.docs
+        .map((d) => ShoppingItemModel.fromMap(d.data(), d.id))
+        .where((i) =>
+            i.nome == nome &&
+            i.data.month == mes.month &&
+            i.data.year == mes.year)
+        .toList();
     if (items.isEmpty) return 0.0;
     return items.fold<double>(0.0, (acc, i) => acc + i.preco) / items.length;
   }

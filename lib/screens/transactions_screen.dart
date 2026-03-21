@@ -1,9 +1,19 @@
 import 'package:financas_inteligentes/models/transaction_model.dart';
-import 'package:financas_inteligentes/services/firestore_service.dart';
+import 'package:financas_inteligentes/providers/transaction_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+/// Tela de transações.
+///
+/// Migração:
+///   - Removido: StreamBuilder direto no build, FirestoreService local,
+///     variáveis de estado tipo/categoria/fixa/superfluo com setState.
+///   - Agora: lê TransactionProvider via context.watch.
+///   - Estado local mantido: valorController (TextEditingController),
+///     _touchEdit (estado do dialog de edição).
+///   - O provider já entrega a lista ordenada por data desc.
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
 
@@ -12,90 +22,47 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class TransactionsScreenState extends State<TransactionsScreen> {
-  final FirestoreService _service = FirestoreService();
   final NumberFormat _currency = NumberFormat.currency(symbol: 'R\$');
   final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
-  final MoneyMaskedTextController valorController = MoneyMaskedTextController(
+
+  // Controller do campo valor — estado local de UI puro
+  final MoneyMaskedTextController _valorController = MoneyMaskedTextController(
     decimalSeparator: ',',
     thousandSeparator: '.',
     leftSymbol: 'R\$ ',
   );
 
-  String tipo = 'entrada';
-  String categoria = '';
-  bool fixa = false;
-  bool superfluo = false;
-
-  final List<String> categoriasEntrada = [
-    'Crédito de Salário',
-    'Adiantamento de Salário',
-    'Pagamento de Benefícios',
-  ];
-
-  final List<String> categoriasSaida = [
-    'Amazon',
-    'Alimentação',
-    'Cartão de Crédito',
-    'Depósito de Construção',
-    'Farmácia',
-    'Lazer',
-    'Mercado Livre',
-    'Magalu',
-    'Moradia',
-    'Padaria',
-    'Pix para esposa',
-    'Papelaria',
-    'Shopee',
-    'Super Mercado',
-    'Serviço de Terceiros',
-    'Serviços de Internet',
-    'Serviços de Energia',
-    'Serviços de Telefonia',
-    'Servicos de Transporte',
-    'Tiktok Shop',
-    'Uber',
-    'Outros',
-  ];
-
   @override
   void dispose() {
-    valorController.dispose();
+    _valorController.dispose();
     super.dispose();
   }
 
-  List<String> get _categoriasAtuais =>
-      tipo == 'entrada' ? categoriasEntrada : categoriasSaida;
-
-  void _resetForm() {
-    setState(() {
-      valorController.updateValue(0.0);
-      categoria = '';
-      fixa = false;
-      superfluo = false;
-    });
-  }
+  // ── Ações ─────────────────────────────────────────────────────────────────
 
   Future<void> _addTransaction() async {
-    if (categoria.isEmpty) {
+    final tx = context.read<TransactionProvider>();
+
+    if (tx.categoria.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecione uma categoria.')),
       );
       return;
     }
 
-    await _service.addTransaction(
+    final ok = await tx.addTransaction(
       TransactionModel(
         id: '',
-        valor: valorController.numberValue,
-        tipo: tipo,
-        categoria: categoria,
-        fixa: fixa,
+        valor: _valorController.numberValue,
+        tipo: tx.tipo,
+        categoria: tx.categoria,
+        fixa: tx.fixa,
         data: DateTime.now(),
-        superfluo: superfluo,
+        superfluo: tx.superfluo,
       ),
     );
 
-    _resetForm();
+    if (ok) _valorController.updateValue(0.0);
   }
 
   void _showEditDialog(TransactionModel trans) {
@@ -116,8 +83,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final categorias =
-                editTipo == 'entrada' ? categoriasEntrada : categoriasSaida;
+            final categorias = editTipo == 'entrada'
+                ? TransactionProvider.categoriasEntrada
+                : TransactionProvider.categoriasSaida;
 
             return AlertDialog(
               title: const Text('Editar transação'),
@@ -135,8 +103,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       initialValue: editTipo,
                       decoration: const InputDecoration(labelText: 'Tipo'),
                       items: const [
-                        DropdownMenuItem(value: 'entrada', child: Text('Entrada')),
-                        DropdownMenuItem(value: 'saida', child: Text('Saída')),
+                        DropdownMenuItem(
+                            value: 'entrada', child: Text('Entrada')),
+                        DropdownMenuItem(
+                            value: 'saida', child: Text('Saída')),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -148,12 +118,13 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      initialValue: editCategoria.isEmpty ? null : editCategoria,
-                      decoration: const InputDecoration(labelText: 'Categoria'),
+                      initialValue:
+                          editCategoria.isEmpty ? null : editCategoria,
+                      decoration:
+                          const InputDecoration(labelText: 'Categoria'),
                       items: categorias
-                          .map(
-                            (e) => DropdownMenuItem(value: e, child: Text(e)),
-                          )
+                          .map((e) =>
+                              DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (v) =>
                           setDialogState(() => editCategoria = v ?? ''),
@@ -166,7 +137,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     SwitchListTile(
                       title: const Text('Supérfluo'),
                       value: editSuperfluo,
-                      onChanged: (v) => setDialogState(() => editSuperfluo = v),
+                      onChanged: (v) =>
+                          setDialogState(() => editSuperfluo = v),
                     ),
                   ],
                 ),
@@ -181,25 +153,23 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     if (editCategoria.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Selecione uma categoria.'),
-                        ),
+                            content: Text('Selecione uma categoria.')),
                       );
                       return;
                     }
-
-                    await _service.updateTransaction(
-                      trans.id,
-                      TransactionModel(
-                        id: trans.id,
-                        valor: editValor.numberValue,
-                        tipo: editTipo,
-                        categoria: editCategoria,
-                        fixa: editFixa,
-                        data: trans.data,
-                        superfluo: editSuperfluo,
-                      ),
-                    );
-
+                    // Usa o provider para atualizar — sem acesso direto ao service
+                    await context.read<TransactionProvider>().updateTransaction(
+                          trans.id,
+                          TransactionModel(
+                            id: trans.id,
+                            valor: editValor.numberValue,
+                            tipo: editTipo,
+                            categoria: editCategoria,
+                            fixa: editFixa,
+                            data: trans.data,
+                            superfluo: editSuperfluo,
+                          ),
+                        );
                     if (!context.mounted) return;
                     Navigator.pop(context);
                   },
@@ -212,6 +182,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       },
     ).then((_) => editValor.dispose());
   }
+
+  // ── Widgets ───────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -229,7 +201,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             backgroundColor: colorScheme.surface,
             child: Icon(Icons.receipt_long, color: colorScheme.primary),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,15 +227,11 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
-  Widget _buildSummary(List<TransactionModel> data) {
+  Widget _buildSummary() {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final entradas = data
-        .where((t) => t.tipo == 'entrada')
-        .fold<double>(0.0, (sum, t) => sum + t.valor);
-    final saidas = data
-        .where((t) => t.tipo == 'saida')
-        .fold<double>(0.0, (sum, t) => sum + t.valor);
+    // Lê totais pré-calculados do provider — sem recalcular na tela
+    final tx = context.watch<TransactionProvider>();
 
     Widget card(String label, double value, Color color) {
       return Expanded(
@@ -283,7 +251,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   _currency.format(value),
-                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                  style: textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ],
             ),
@@ -294,17 +263,20 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
     return Row(
       children: [
-        card('Entradas', entradas, colorScheme.tertiary),
+        card('Entradas', tx.totalEntradas, colorScheme.tertiary),
         const SizedBox(width: 10),
-        card('Saídas', saidas, colorScheme.error),
+        card('Saídas', tx.totalSaidas, colorScheme.error),
         const SizedBox(width: 10),
-        card('Saldo', entradas - saidas, colorScheme.primary),
+        card('Saldo', tx.saldo, colorScheme.primary),
       ],
     );
   }
 
   Widget _buildForm() {
     final colorScheme = Theme.of(context).colorScheme;
+    // context.watch → rebuild do form quando provider notifica (tipo, categoria, etc.)
+    final tx = context.watch<TransactionProvider>();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -314,7 +286,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       child: Column(
         children: [
           TextField(
-            controller: valorController,
+            controller: _valorController,
             decoration: const InputDecoration(labelText: 'Valor'),
             keyboardType: TextInputType.number,
           ),
@@ -332,39 +304,48 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 icon: Icon(Icons.arrow_upward),
               ),
             ],
-            selected: {tipo},
-            onSelectionChanged: (value) => setState(() {
-              tipo = value.first;
-              categoria = '';
-            }),
+            selected: {tx.tipo},
+            onSelectionChanged: (value) =>
+                context.read<TransactionProvider>().setTipo(value.first),
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            initialValue: categoria.isEmpty ? null : categoria,
+            // key garante reset do dropdown quando o tipo muda
+            key: ValueKey('cat_${tx.tipo}'),
+            initialValue: tx.categoria.isEmpty ? null : tx.categoria,
             decoration: const InputDecoration(labelText: 'Categoria'),
-            items: _categoriasAtuais
+            items: tx.categoriasAtuais
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            onChanged: (v) => setState(() => categoria = v ?? ''),
+            onChanged: (v) =>
+                context.read<TransactionProvider>().setCategoria(v ?? ''),
           ),
           SwitchListTile(
             dense: true,
             title: const Text('Despesa fixa'),
-            value: fixa,
-            onChanged: (v) => setState(() => fixa = v),
+            value: tx.fixa,
+            onChanged: (v) =>
+                context.read<TransactionProvider>().setFixa(v),
           ),
           SwitchListTile(
             dense: true,
             title: const Text('Supérfluo'),
-            value: superfluo,
-            onChanged: (v) => setState(() => superfluo = v),
+            value: tx.superfluo,
+            onChanged: (v) =>
+                context.read<TransactionProvider>().setSuperfluo(v),
           ),
           const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _addTransaction,
-              icon: const Icon(Icons.add),
+              onPressed: tx.isSubmitting ? null : _addTransaction,
+              icon: tx.isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
               label: const Text('Adicionar transação'),
             ),
           ),
@@ -381,16 +362,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor:
-              isEntrada ? colorScheme.tertiaryContainer : colorScheme.errorContainer,
+          backgroundColor: isEntrada
+              ? colorScheme.tertiaryContainer
+              : colorScheme.errorContainer,
           child: Icon(
             isEntrada ? Icons.arrow_downward : Icons.arrow_upward,
             color: isEntrada ? colorScheme.tertiary : colorScheme.error,
           ),
         ),
-        title: Text(t.categoria, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(t.categoria,
+            style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(
-          '${_dateFormat.format(t.data)} • ${t.fixa ? 'Fixa' : 'Variável'}${t.superfluo ? ' • Supérfluo' : ''}',
+          '${_dateFormat.format(t.data)} • ${t.fixa ? 'Fixa' : 'Variável'}'
+          '${t.superfluo ? ' • Supérfluo' : ''}',
         ),
         trailing: Wrap(
           spacing: 2,
@@ -408,7 +392,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              onPressed: () => _service.deleteTransaction(t.id),
+              onPressed: () =>
+                  context.read<TransactionProvider>().deleteTransaction(t.id),
             ),
           ],
         ),
@@ -416,9 +401,15 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    // context.watch → rebuild quando a lista de transações muda
+    final tx = context.watch<TransactionProvider>();
+    final data = tx.transactions;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -431,59 +422,51 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: StreamBuilder<List<TransactionModel>>(
-              stream: _service.getTransactions(),
-              builder: (context, snapshot) {
-                final data = List<TransactionModel>.from(snapshot.data ?? [])
-                  ..sort((a, b) => b.data.compareTo(a.data));
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isWide = constraints.maxWidth >= 1100;
 
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final bool isWide = constraints.maxWidth >= 1100;
-
-                    final Widget listWidget = data.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Sem transações ainda.',
-                              style: TextStyle(color: colorScheme.onPrimary),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: data.length,
-                            itemBuilder: (context, index) => _buildTile(data[index]),
-                          );
-
-                    return Column(
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 10),
-                        _buildSummary(data),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: isWide
-                              ? Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        child: _buildForm(),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: listWidget),
-                                  ],
-                                )
-                              : Column(
-                                  children: [
-                                    _buildForm(),
-                                    const SizedBox(height: 10),
-                                    Expanded(child: listWidget),
-                                  ],
-                                ),
+                final Widget listWidget = data.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Sem transações ainda.',
+                          style: TextStyle(color: colorScheme.onPrimary),
                         ),
-                      ],
-                    );
-                  },
+                      )
+                    : ListView.builder(
+                        itemCount: data.length,
+                        itemBuilder: (context, index) =>
+                            _buildTile(data[index]),
+                      );
+
+                return Column(
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 10),
+                    _buildSummary(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: isWide
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                      child: _buildForm()),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(child: listWidget),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                _buildForm(),
+                                const SizedBox(height: 10),
+                                Expanded(child: listWidget),
+                              ],
+                            ),
+                    ),
+                  ],
                 );
               },
             ),

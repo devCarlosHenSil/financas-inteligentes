@@ -1,6 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import 'package:financas_inteligentes/providers/app_providers.dart';
+import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
@@ -11,12 +14,17 @@ Future<void> main() async {
 
   String? startupError;
   try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
   } catch (error) {
     startupError = error.toString();
   }
 
-  runApp(MyApp(startupError: startupError));
+  runApp(
+    AppProviders(
+      child: MyApp(startupError: startupError),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -33,14 +41,29 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
+      // Roteamento reativo baseado no AuthProvider —
+      // quando o usuário desloga, a home volta automaticamente para LoginScreen
       home: hasStartupError
           ? _StartupErrorScreen(message: startupError!)
-          : const LoginScreen(),
+          : const _AuthGate(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),
       },
     );
+  }
+}
+
+/// Roteador reativo: observa o AuthProvider e decide qual tela exibir.
+/// Substitui a navegação imperativa com pushReplacementNamed que existia
+/// em cada tela — agora o app reage automaticamente ao estado de sessão.
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    return auth.isAuthenticated ? const DashboardScreen() : const LoginScreen();
   }
 }
 

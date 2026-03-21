@@ -1,6 +1,14 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:financas_inteligentes/providers/auth_provider.dart';
 
+/// Tela de login/cadastro.
+///
+/// Migração: era StatefulWidget com FirebaseAuth diretamente.
+/// Agora: lê AuthProvider via context.watch para loading/erro,
+/// e delega operações de autenticação ao provider.
+/// A navegação pós-login é feita pelo _AuthGate em main.dart —
+/// esta tela não precisa mais chamar Navigator.pushReplacementNamed.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -9,18 +17,23 @@ class LoginScreen extends StatefulWidget {
 }
 
 class LoginScreenState extends State<LoginScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
-
-  bool isLoading = false;
   bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
-
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -31,23 +44,21 @@ class LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => isLoading = true);
-    try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    } catch (e) {
-      if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.signIn(email: email, password: password);
+
+    if (!mounted) return;
+    if (!ok && auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao entrar: $e')),
+        SnackBar(content: Text(auth.errorMessage!)),
       );
+      auth.clearError();
     }
-    if (mounted) setState(() => isLoading = false);
+    // Navegação é feita automaticamente pelo _AuthGate via authStateChanges
   }
 
   Future<void> _register() async {
     FocusScope.of(context).unfocus();
-
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -58,27 +69,16 @@ class LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => isLoading = true);
-    try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao cadastrar: $e')),
-      );
-    }
-    if (mounted) setState(() => isLoading = false);
-  }
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.register(email: email, password: password);
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _emailFocus.dispose();
-    _passwordFocus.dispose();
-    super.dispose();
+    if (!mounted) return;
+    if (!ok && auth.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.errorMessage!)),
+      );
+      auth.clearError();
+    }
   }
 
   InputDecoration _inputDecoration(
@@ -91,7 +91,8 @@ class LoginScreenState extends State<LoginScreen> {
     final textTheme = Theme.of(context).textTheme;
     return InputDecoration(
       hintText: hint,
-      hintStyle: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+      hintStyle:
+          textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
       prefixIcon: Icon(icon),
       suffixIcon: suffixIcon,
     );
@@ -101,6 +102,8 @@ class LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    // context.watch garante rebuild quando isLoading muda
+    final isLoading = context.watch<AuthProvider>().isLoading;
 
     return Scaffold(
       body: Container(
@@ -119,7 +122,8 @@ class LoginScreenState extends State<LoginScreen> {
                 elevation: 2,
                 shadowColor: colorScheme.shadow,
                 color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.88),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24)),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
@@ -145,7 +149,8 @@ class LoginScreenState extends State<LoginScreen> {
                         'Acesse sua conta para continuar.',
                         textAlign: TextAlign.center,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.82),
+                          color: colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.82),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -162,7 +167,8 @@ class LoginScreenState extends State<LoginScreen> {
                         focusNode: _emailFocus,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        onSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocus),
+                        onSubmitted: (_) =>
+                            FocusScope.of(context).requestFocus(_passwordFocus),
                         decoration: _inputDecoration(
                           context,
                           hint: 'seuemail@dominio.com',
@@ -189,9 +195,12 @@ class LoginScreenState extends State<LoginScreen> {
                           hint: 'Digite sua senha',
                           icon: Icons.lock_outline,
                           suffixIcon: IconButton(
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
                           ),
                         ),
@@ -205,7 +214,8 @@ class LoginScreenState extends State<LoginScreen> {
                               ? const SizedBox(
                                   width: 22,
                                   height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.4),
                                 )
                               : const Text('Entrar'),
                         ),
