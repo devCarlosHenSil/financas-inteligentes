@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:financas_inteligentes/firebase_options.dart';
 import 'package:financas_inteligentes/providers/app_providers.dart';
@@ -9,10 +10,19 @@ import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
+import 'package:financas_inteligentes/theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── ThemeController ────────────────────────────────────────────────────
+  final prefs = await SharedPreferences.getInstance();
+  final themeController = ThemeController(
+    prefs: prefs,
+    initialMode: ThemeController.resolveThemeMode(prefs),
+  );
+
+  // ── Firebase ───────────────────────────────────────────────────────────
   String? startupError;
   try {
     await Firebase.initializeApp(
@@ -23,8 +33,14 @@ Future<void> main() async {
   }
 
   runApp(
-    AppProviders(
-      child: MyApp(startupError: startupError),
+    ThemeScope(
+      controller: themeController,
+      child: AppProviders(
+        child: MyApp(
+          startupError: startupError,
+          themeController: themeController,
+        ),
+      ),
     ),
   );
 }
@@ -32,26 +48,34 @@ Future<void> main() async {
 // ── MyApp ──────────────────────────────────────────────────────────────────────
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.startupError});
+  const MyApp({
+    super.key,
+    this.startupError,
+    required this.themeController,
+  });
 
-  final String? startupError;
+  final String?         startupError;
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
     final hasStartupError = startupError != null && startupError!.isNotEmpty;
 
-    return MaterialApp(
-      title: 'Finanças Inteligentes',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
-      home: hasStartupError
-          ? _StartupErrorScreen(message: startupError!)
-          : const _AuthGate(),
-      routes: {
-        '/login':     (context) => const LoginScreen(),
-        '/dashboard': (context) => const DashboardScreen(),
-      },
+    return ListenableBuilder(
+      listenable: themeController,
+      builder: (context, _) => MaterialApp(
+        title: 'Finanças Inteligentes',
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: themeController.mode,
+        home: hasStartupError
+            ? _StartupErrorScreen(message: startupError!)
+            : const _AuthGate(),
+        routes: {
+          '/login':     (context) => const LoginScreen(),
+          '/dashboard': (context) => const DashboardScreen(),
+        },
+      ),
     );
   }
 }
