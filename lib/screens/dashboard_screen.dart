@@ -3,6 +3,7 @@ import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
 import 'package:financas_inteligentes/screens/goals_screen.dart';
 import 'package:financas_inteligentes/screens/investments_screen.dart';
+import 'package:financas_inteligentes/screens/notification_settings_screen.dart';
 import 'package:financas_inteligentes/screens/shopping_list_screen.dart';
 import 'package:financas_inteligentes/screens/transactions_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -48,19 +49,19 @@ class DashboardScreenState extends State<DashboardScreen> {
   Color _categoryColor(String category, {required bool isIncome, int index = 0}) {
     if (isIncome) return _incomeTone(index);
     final name = category.toLowerCase().trim();
-    if (name.contains('uber'))         return const Color(0xFF111111);
-    if (name.contains('mercado livre'))return const Color(0xFFFDD835);
-    if (name.contains('shopee'))       return const Color(0xFFFF6D00);
-    if (name.contains('amazon'))       return const Color(0xFFFF9900);
+    if (name.contains('uber'))          return const Color(0xFF111111);
+    if (name.contains('mercado livre')) return const Color(0xFFFDD835);
+    if (name.contains('shopee'))        return const Color(0xFFFF6D00);
+    if (name.contains('amazon'))        return const Color(0xFFFF9900);
     if (name.contains('magalu') || name.contains('magazine luiza')) {
       return const Color(0xFF0086FF);
     }
     if (name.contains('farmácia') || name.contains('farmacia')) {
       return const Color(0xFFE91E63);
     }
-    if (name.contains('lazer'))        return const Color(0xFF7C3AED);
-    if (name.contains('telefone'))     return const Color(0xFF84CC16);
-    if (name.contains('internet'))     return const Color(0xFFEF4444);
+    if (name.contains('lazer'))    return const Color(0xFF7C3AED);
+    if (name.contains('telefone')) return const Color(0xFF84CC16);
+    if (name.contains('internet')) return const Color(0xFFEF4444);
     final hue = (name.codeUnits.fold<int>(0, (sum, c) => sum + c) % 360).toDouble();
     return HSVColor.fromAHSV(1, hue, 0.50, 0.92).toColor();
   }
@@ -81,15 +82,24 @@ class DashboardScreenState extends State<DashboardScreen> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
-      return [PieChartSectionData(value: 1, color: colorScheme.onSurfaceVariant, title: '', radius: 72)];
+      return [
+        PieChartSectionData(
+          value: 1,
+          color: colorScheme.onSurfaceVariant,
+          title: '',
+          radius: 72,
+        ),
+      ];
     }
     final total = items.fold<double>(0.0, (sum, item) => sum + item.valor);
     return List.generate(items.length, (index) {
-      final item   = items[index];
-      final percent = total == 0 ? 0.0 : (item.valor / total) * 100.0;
+      final item       = items[index];
+      final percent    = total == 0 ? 0.0 : (item.valor / total) * 100.0;
       final isTouched    = index == touchedIndex;
       final isLargeSlice = percent >= 20;
-      final radius = isTouched ? (isLargeSlice ? 82.0 : 88.0) : (isLargeSlice ? 70.0 : 78.0);
+      final radius = isTouched
+          ? (isLargeSlice ? 82.0 : 88.0)
+          : (isLargeSlice ? 70.0 : 78.0);
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
@@ -106,8 +116,11 @@ class DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  _CategorySelection? _selectedCategory(List<_CategoryTotal> items, int touchedIndex) {
-    if (items.isEmpty || touchedIndex < 0 || touchedIndex >= items.length) return null;
+  _CategorySelection? _selectedCategory(
+      List<_CategoryTotal> items, int touchedIndex) {
+    if (items.isEmpty || touchedIndex < 0 || touchedIndex >= items.length) {
+      return null;
+    }
     final total        = items.fold<double>(0.0, (sum, item) => sum + item.valor);
     final selectedItem = items[touchedIndex];
     final percent      = total == 0 ? 0.0 : (selectedItem.valor / total) * 100.0;
@@ -116,12 +129,15 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildCategoryList(List<_CategoryTotal> items, {required bool isIncome}) {
+  Widget _buildCategoryList(List<_CategoryTotal> items,
+      {required bool isIncome}) {
     final textTheme   = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
-      return Text('Sem categorias no período.',
-          style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant));
+      return Text(
+        'Sem categorias no período.',
+        style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+      );
     }
     return Wrap(
       spacing: 12,
@@ -133,13 +149,16 @@ class DashboardScreenState extends State<DashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 10, height: 10,
+              width: 10,
+              height: 10,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),
-            Text(item.nome,
-                style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface, fontSize: 12)),
+            Text(
+              item.nome,
+              style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface, fontSize: 12),
+            ),
           ],
         );
       }),
@@ -156,7 +175,8 @@ class DashboardScreenState extends State<DashboardScreen> {
         sectionsSpace: 2,
         centerSpaceRadius: 46,
         borderData: FlBorderData(show: false),
-        sections: _getPieSections(items, isIncome: isIncome, touchedIndex: touchedIndex),
+        sections: _getPieSections(items,
+            isIncome: isIncome, touchedIndex: touchedIndex),
         pieTouchData: PieTouchData(
           enabled: items.isNotEmpty,
           touchCallback: (event, response) {
@@ -196,13 +216,16 @@ class DashboardScreenState extends State<DashboardScreen> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            Text(title,
-                style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+            Text(
+              title,
+              style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+            ),
             const SizedBox(height: 10),
             Expanded(
-                child: _buildPieChart(items,
-                    isIncome: isIncome, touchedIndex: touchedIndex)),
+              child: _buildPieChart(items,
+                  isIncome: isIncome, touchedIndex: touchedIndex),
+            ),
             const SizedBox(height: 8),
             Text(
               selection == null
@@ -241,19 +264,22 @@ class DashboardScreenState extends State<DashboardScreen> {
           CircleAvatar(
             radius: 24,
             backgroundColor: colorScheme.surface,
-            child: Text(initial,
-                style: textTheme.titleMedium?.copyWith(
-                    color: colorScheme.primary, fontWeight: FontWeight.w800)),
+            child: Text(
+              initial,
+              style: textTheme.titleMedium?.copyWith(
+                  color: colorScheme.primary, fontWeight: FontWeight.w800),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Dashboard Financeiro',
-                    style: textTheme.titleLarge?.copyWith(
-                        color: colorScheme.onPrimary,
-                        fontWeight: FontWeight.w800)),
+                Text(
+                  'Dashboard Financeiro',
+                  style: textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   'Olá, $userLabel • ${now[0].toUpperCase()}${now.substring(1)}',
@@ -263,9 +289,25 @@ class DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          Text(_currencyFormatter.format(saldo),
-              style: textTheme.titleLarge?.copyWith(
-                  color: colorScheme.onPrimary, fontWeight: FontWeight.w800)),
+          // ── Botão de notificações ──────────────────────────────────────
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationSettingsScreen(),
+              ),
+            ),
+            icon: Icon(
+              Icons.notifications_outlined,
+              color: colorScheme.onPrimary,
+            ),
+            tooltip: 'Notificações',
+          ),
+          Text(
+            _currencyFormatter.format(saldo),
+            style: textTheme.titleLarge?.copyWith(
+                color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+          ),
         ],
       ),
     );
@@ -279,7 +321,10 @@ class DashboardScreenState extends State<DashboardScreen> {
     return SizedBox(
       height: 48,
       child: FilledButton.tonalIcon(
-          onPressed: onPressed, icon: Icon(icon), label: Text(label)),
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(label),
+      ),
     );
   }
 
@@ -306,8 +351,11 @@ class DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.flag_outlined,
-                  color: overdue > 0 ? Colors.orange : cs.primary, size: 22),
+              Icon(
+                Icons.flag_outlined,
+                color: overdue > 0 ? Colors.orange : cs.primary,
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -315,9 +363,11 @@ class DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Row(
                       children: [
-                        Text('Metas financeiras',
-                            style: tt.labelLarge
-                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(
+                          'Metas financeiras',
+                          style: tt.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
                         if (overdue > 0) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -327,10 +377,12 @@ class DashboardScreenState extends State<DashboardScreen> {
                               color: Colors.orange.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text('$overdue em atraso',
-                                style: tt.labelSmall?.copyWith(
-                                    color: Colors.orange.shade700,
-                                    fontWeight: FontWeight.w700)),
+                            child: Text(
+                              '$overdue em atraso',
+                              style: tt.labelSmall?.copyWith(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ],
                       ],
@@ -357,12 +409,16 @@ class DashboardScreenState extends State<DashboardScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${(progress * 100).toStringAsFixed(0)}%',
-                      style: tt.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800, color: cs.primary)),
-                  Text('$active ativa${active != 1 ? 's' : ''}',
-                      style: tt.labelSmall
-                          ?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800, color: cs.primary),
+                  ),
+                  Text(
+                    '$active ativa${active != 1 ? 's' : ''}',
+                    style:
+                        tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                 ],
               ),
               const SizedBox(width: 4),
@@ -375,8 +431,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildInsightsAndActions(double saldo) {
-    final colorScheme  = Theme.of(context).colorScheme;
-    final textTheme    = Theme.of(context).textTheme;
+    final colorScheme   = Theme.of(context).colorScheme;
+    final textTheme     = Theme.of(context).textTheme;
     final saldoPositivo = saldo >= 0;
     final analise       = context.read<TransactionProvider>().analiseGastos;
 
@@ -398,9 +454,11 @@ class DashboardScreenState extends State<DashboardScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(analise,
-                      style: textTheme.bodyMedium
-                          ?.copyWith(color: colorScheme.onSurface)),
+                  child: Text(
+                    analise,
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: colorScheme.onSurface),
+                  ),
                 ),
               ),
             ),
@@ -409,9 +467,11 @@ class DashboardScreenState extends State<DashboardScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: Text(sugestao,
-                      style: textTheme.bodyMedium
-                          ?.copyWith(color: colorScheme.onSurface)),
+                  child: Text(
+                    sugestao,
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: colorScheme.onSurface),
+                  ),
                 ),
               ),
             ),
@@ -419,13 +479,16 @@ class DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 10),
 
-        // ── Botões de navegação (agora com 4 botões em 2x2) ─────────────
+        // ── Botões de navegação 2x2 ──────────────────────────────────────
         Row(
           children: [
             Expanded(
               child: _buildActionButton(
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const TransactionsScreen())),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const TransactionsScreen()),
+                ),
                 icon: Icons.receipt_long,
                 label: 'Transações',
               ),
@@ -433,8 +496,11 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: _buildActionButton(
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const InvestmentsScreen())),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const InvestmentsScreen()),
+                ),
                 icon: Icons.trending_up,
                 label: 'Investimentos',
               ),
@@ -446,8 +512,11 @@ class DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: _buildActionButton(
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ShoppingListScreen()),
+                ),
                 icon: Icons.shopping_cart,
                 label: 'Lista de Compras',
               ),
@@ -455,8 +524,10 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: _buildActionButton(
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const GoalsScreen())),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GoalsScreen()),
+                ),
                 icon: Icons.flag_outlined,
                 label: 'Metas',
               ),

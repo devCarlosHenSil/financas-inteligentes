@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/investment_provider.dart';
+import 'package:financas_inteligentes/providers/notification_provider.dart';
 import 'package:financas_inteligentes/providers/shopping_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
 import 'package:financas_inteligentes/services/api_service.dart';
@@ -18,10 +19,11 @@ import 'package:financas_inteligentes/services/market_cache_service.dart';
 /// FirestoreService
 /// ApiService
 /// MarketCacheService
-/// TransactionProvider   ← depende de FirestoreService
-/// InvestmentProvider    ← depende de FirestoreService + ApiService + MarketCacheService
-/// ShoppingProvider      ← depende de FirestoreService
-/// GoalProvider          ← depende de FirestoreService
+/// TransactionProvider     ← depende de FirestoreService
+/// InvestmentProvider      ← depende de FirestoreService + ApiService + MarketCacheService
+/// ShoppingProvider        ← depende de FirestoreService
+/// GoalProvider            ← depende de FirestoreService
+/// NotificationProvider    ← independente (usa SharedPreferences + NotificationService)
 /// ```
 class AppProviders extends StatelessWidget {
   const AppProviders({super.key, required this.child});
@@ -80,6 +82,11 @@ class AppProviders extends StatelessWidget {
           create: (ctx) => GoalProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
               previous ?? GoalProvider(service),
+        ),
+
+        // NotificationProvider — notificações locais de dividendos e metas
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (_) => NotificationProvider(),
         ),
       ],
       child: child,

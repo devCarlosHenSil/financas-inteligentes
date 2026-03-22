@@ -1,6 +1,5 @@
 import 'package:financas_inteligentes/models/shopping_item_model.dart';
 import 'package:financas_inteligentes/services/firestore_service.dart';
-import 'package:financas_inteligentes/widgets/theme_mode_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:geocoding/geocoding.dart';
@@ -406,11 +405,6 @@ class ShoppingListScreenState extends State<ShoppingListScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: ThemeModeToggle(compact: true),
-                    ),
-                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(

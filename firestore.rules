@@ -1,0 +1,130 @@
+rules_version = '2';
+
+// ── Finanças Inteligentes — Regras de Segurança Firestore ────────────────────
+//
+// Estrutura do banco:
+//   usuarios/{userId}/transacoes/{docId}
+//   usuarios/{userId}/investimentos/{docId}
+//   usuarios/{userId}/proventos/{docId}
+//   usuarios/{userId}/rentabilidade/{docId}
+//   usuarios/{userId}/lista_compras/{docId}
+//   usuarios/{userId}/metas/{docId}
+//
+// Regra base: cada usuário só pode ler e escrever seus próprios dados.
+// Nenhuma coleção pública existe — todo acesso exige autenticação.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Funções auxiliares ─────────────────────────────────────────────────
+
+    // Verifica se o solicitante está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifica se o solicitante é o dono do documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Valida campos obrigatórios em transações
+    function isValidTransaction() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['valor', 'tipo', 'categoria', 'fixa', 'data'])
+          && data.valor is number
+          && data.valor > 0
+          && (data.tipo == 'entrada' || data.tipo == 'saida')
+          && data.categoria is string
+          && data.categoria.size() > 0
+          && data.fixa is bool;
+    }
+
+    // Valida campos obrigatórios em investimentos
+    function isValidInvestment() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome', 'valorInvestido', 'data'])
+          && data.nome is string
+          && data.nome.size() > 0
+          && data.valorInvestido is number;
+    }
+
+    // Valida campos obrigatórios em metas
+    function isValidGoal() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['title', 'type', 'targetValue', 'currentValue', 'createdAt', 'status'])
+          && data.title is string
+          && data.title.size() > 0
+          && data.targetValue is number
+          && data.targetValue > 0
+          && data.currentValue is number
+          && data.currentValue >= 0;
+    }
+
+    // ── Documento raiz do usuário ──────────────────────────────────────────
+    // Bloqueia acesso direto ao documento usuarios/{userId}
+    match /usuarios/{userId} {
+      allow read, write: if false;
+
+      // ── Transações ─────────────────────────────────────────────────────
+      match /transacoes/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTransaction();
+        allow update: if isOwner(userId) && isValidTransaction();
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Investimentos ───────────────────────────────────────────────────
+      match /investimentos/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId) && isValidInvestment();
+        allow update: if isOwner(userId) && isValidInvestment();
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Proventos ───────────────────────────────────────────────────────
+      match /proventos/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Rentabilidade ───────────────────────────────────────────────────
+      match /rentabilidade/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Lista de compras ────────────────────────────────────────────────
+      match /lista_compras/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Metas financeiras ───────────────────────────────────────────────
+      match /metas/{docId} {
+        allow read:   if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGoal();
+        allow update: if isOwner(userId) && isValidGoal();
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Subcoleções futuras (wildcard de segurança) ─────────────────────
+      // Qualquer subcoleção não listada acima é bloqueada por padrão.
+      // Para adicionar uma nova coleção, crie uma regra explícita acima.
+      match /{collection}/{docId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── Bloqueia todo o resto ──────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

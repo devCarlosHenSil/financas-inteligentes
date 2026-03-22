@@ -1,78 +1,58 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:financas_inteligentes/firebase_options.dart';
+import 'package:flutter/foundation.dart';
 import 'package:financas_inteligentes/providers/app_providers.dart';
-import 'package:financas_inteligentes/providers/auth_provider.dart';
-import 'package:financas_inteligentes/screens/dashboard_screen.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
+import 'package:financas_inteligentes/screens/dashboard_screen.dart';
+import 'package:financas_inteligentes/services/notification_service.dart';
 import 'package:financas_inteligentes/theme/app_theme.dart';
-import 'package:financas_inteligentes/theme/theme_controller.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── ThemeController ────────────────────────────────────────────────────
-  final prefs = await SharedPreferences.getInstance();
-  final themeController = ThemeController(
-    prefs: prefs,
-    initialMode: ThemeController.resolveThemeMode(prefs),
-  );
-
-  // ── Firebase ───────────────────────────────────────────────────────────
   String? startupError;
   try {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+        options: DefaultFirebaseOptions.currentPlatform);
   } catch (error) {
     startupError = error.toString();
   }
 
-  runApp(
-    ThemeScope(
-      controller: themeController,
-      child: AppProviders(
-        child: MyApp(
-          startupError: startupError,
-          themeController: themeController,
-        ),
-      ),
-    ),
-  );
+  // Inicializa o serviço de notificações (não-fatal se falhar)
+  if (!kIsWeb) {
+    try {
+      await NotificationService.instance.init();
+    } catch (_) {
+      // Silencioso — notificações são opcionais
+    }
+  }
+
+  runApp(MyApp(startupError: startupError));
 }
 
-// ── MyApp ──────────────────────────────────────────────────────────────────────
-
 class MyApp extends StatelessWidget {
-  const MyApp({
-    super.key,
-    this.startupError,
-    required this.themeController,
-  });
+  const MyApp({super.key, this.startupError});
 
-  final String?         startupError;
-  final ThemeController themeController;
+  final String? startupError;
 
   @override
   Widget build(BuildContext context) {
     final hasStartupError = startupError != null && startupError!.isNotEmpty;
 
-    return ListenableBuilder(
-      listenable: themeController,
-      builder: (context, _) => MaterialApp(
+    return AppProviders(
+      child: MaterialApp(
         title: 'Finanças Inteligentes',
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: themeController.mode,
+        themeMode: ThemeMode.system,
+        debugShowCheckedModeBanner: false,
         home: hasStartupError
             ? _StartupErrorScreen(message: startupError!)
             : const _AuthGate(),
         routes: {
-          '/login':     (context) => const LoginScreen(),
+          '/login': (context) => const LoginScreen(),
           '/dashboard': (context) => const DashboardScreen(),
         },
       ),
@@ -80,28 +60,92 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ── _AuthGate ──────────────────────────────────────────────────────────────────
+// ── AuthGate ──────────────────────────────────────────────────────────────────
+//
+// Escuta authStateChanges do Firebase via AuthProvider e decide qual tela
+// exibir sem depender de Navigator.pushReplacementNamed nas telas filhas.
+//
+// Fluxo:
+//   - null (não autenticado)  → LoginScreen
+//   - User  (autenticado)     → DashboardScreen
+//   - Transição               → SplashScreen (evita flash de tela errada)
+//
+// Por que usar StreamBuilder aqui em vez de apenas context.watch<AuthProvider>:
+//   O AuthProvider inicializa com FirebaseAuth.instance.currentUser no construtor,
+//   mas o stream pode ainda estar carregando na primeira frame. O StreamBuilder
+//   garante que a decisão seja sempre baseada no estado mais recente do Firebase,
+//   não no snapshot inicial do provider.
 
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Aguardando resposta do Firebase (primeira frame)
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _SplashScreen();
+        }
 
-    if (auth.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+        // Erro no stream de autenticação — exibe tela de login por segurança
+        if (snapshot.hasError) {
+          return const LoginScreen();
+        }
 
-    return auth.isAuthenticated
-        ? const DashboardScreen()
-        : const LoginScreen();
+        // Usuário autenticado → Dashboard
+        if (snapshot.hasData && snapshot.data != null) {
+          return const DashboardScreen();
+        }
+
+        // Não autenticado → Login
+        return const LoginScreen();
+      },
+    );
   }
 }
 
-// ── _StartupErrorScreen ────────────────────────────────────────────────────────
+// ── SplashScreen ──────────────────────────────────────────────────────────────
+//
+// Exibida apenas durante a verificação inicial do estado de autenticação
+// (tipicamente < 300ms). Evita o "flash" de LoginScreen para DashboardScreen
+// em usuários que já estavam logados.
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 56,
+              color: colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── StartupErrorScreen ────────────────────────────────────────────────────────
 
 class _StartupErrorScreen extends StatelessWidget {
   const _StartupErrorScreen({required this.message});
@@ -110,7 +154,8 @@ class _StartupErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFirebaseWebImportError = kIsWeb && message.contains('firebasejs/');
+    final isFirebaseWebImportError =
+        kIsWeb && message.contains('firebasejs/');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Falha ao iniciar app')),
@@ -139,13 +184,14 @@ class _StartupErrorScreen extends StatelessWidget {
               ),
               child: SelectableText(
                 message,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                style:
+                    const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
             ),
             const SizedBox(height: 12),
             const Text(
-              'Dica: se estiver rodando no Chrome corporativo/restrito, '
-              'teste em outra rede ou navegador sem bloqueio de CDN.',
+              'Dica: se estiver rodando no Chrome corporativo/restrito, teste em outra rede '
+              'ou navegador sem bloqueio de CDN.',
             ),
           ],
         ),
