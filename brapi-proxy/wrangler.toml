@@ -1,3 +1,7 @@
 name = "brapi-proxy"
 main = "src/worker.js"
 compatibility_date = "2026-03-10"
+
+# Defina o token da BRAPI como secret:
+#   npx wrangler secret put BRAPI_TOKEN
+# O valor nunca deve ser commitado no repositório.
