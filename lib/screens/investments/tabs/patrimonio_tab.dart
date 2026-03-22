@@ -6,6 +6,103 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+// ── Helpers de cálculo real ───────────────────────────────────────────────────
+
+/// Retorna o ticker/nome do ativo a partir do nome completo do lançamento.
+/// Formato: "Tipo • Ativo • Operação"
+String _ativoFromNome(String nome) {
+  final parts = nome.split('•').map((e) => e.trim()).toList();
+  return parts.length > 1 ? parts[1] : nome;
+}
+
+/// Agrupa investimentos por ativo (segunda parte do nome) e soma os valores.
+/// Filtra apenas compras (valorInvestido > 0) para evitar distorção dos gráficos.
+Map<String, double> _distributionByAtivo(List<InvestmentModel> data) {
+  final dist = <String, double>{};
+  for (final inv in data) {
+    if (inv.valorInvestido <= 0) continue; // ignora vendas
+    final ativo = _ativoFromNome(inv.nome);
+    dist.update(ativo, (v) => v + inv.valorInvestido,
+        ifAbsent: () => inv.valorInvestido);
+  }
+  // Ordena por valor decrescente e retorna top 10
+  final sorted = dist.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  return Map.fromEntries(sorted.take(10));
+}
+
+/// Filtra investimentos por tipo (primeira parte do nome).
+/// Ex.: tipo = 'Ações' → retorna apenas lançamentos de ações.
+List<InvestmentModel> _filterByTipo(
+    List<InvestmentModel> data, String tipo) {
+  return data
+      .where((inv) =>
+          inv.valorInvestido > 0 &&
+          inv.nome.split('•').first.trim().toLowerCase() ==
+              tipo.toLowerCase())
+      .toList();
+}
+
+/// Converte uma lista de InvestmentModel em LegendEntry por ativo,
+/// usando uma paleta HSV distribuída uniformemente.
+List<LegendEntry> _toAtivoEntries(List<InvestmentModel> data) {
+  final dist = _distributionByAtivo(data);
+  if (dist.isEmpty) return [];
+  final total = dist.length;
+  return dist.entries.toList().asMap().entries.map((e) {
+    final hue = (e.key * 360 / total) % 360;
+    return LegendEntry(
+      label: e.value.key,
+      amount: e.value.value,
+      color: HSVColor.fromAHSV(1, hue, 0.65, 0.85).toColor(),
+    );
+  }).toList();
+}
+
+/// Calcula a evolução mensal dos últimos 12 meses a partir dos lançamentos reais.
+///
+/// Retorna duas listas paralelas:
+///   [applied] — soma acumulada dos aportes até aquele mês
+///   [gain]    — ganho estimado (6% a.a. simples sobre o acumulado do mês)
+({List<double> applied, List<double> gain}) _calcEvolucao(
+    List<InvestmentModel> data, List<DateTime> months) {
+  // Soma de aportes (compras - vendas) por mês
+  final monthlyNet = <int, double>{};
+  for (final inv in data) {
+    final key = DateTime(inv.data.year, inv.data.month).millisecondsSinceEpoch;
+    monthlyNet.update(key, (v) => v + inv.valorInvestido,
+        ifAbsent: () => inv.valorInvestido);
+  }
+
+  final applied = <double>[];
+  final gain = <double>[];
+  double acumulado = 0;
+
+  for (final month in months) {
+    final key = DateTime(month.year, month.month).millisecondsSinceEpoch;
+    acumulado += monthlyNet[key] ?? 0;
+    final acumuladoPos = acumulado < 0 ? 0.0 : acumulado;
+    applied.add(acumuladoPos);
+    // Ganho estimado: 6% a.a. → 0.5% a.m. sobre o valor acumulado
+    gain.add(acumuladoPos * 0.005);
+  }
+
+  return (applied: applied, gain: gain);
+}
+
+// ── PatrimonioTab ─────────────────────────────────────────────────────────────
+//
+// P2-B: todos os dados agora calculados sobre InvestmentModel reais.
+//
+// REMOVIDO — valores hardcoded: BBAS3, WEGE3, ITSA3, GARE11, etc.
+// REMOVIDO — appliedSeed, gainSeed com fórmulas arbitrárias
+// ADICIONADO — _calcEvolucao: evolução mensal real dos aportes
+// ADICIONADO — _toAtivoEntries: donut por ativo real
+// ADICIONADO — _filterByTipo: filtra ações, FIIs, renda fixa, cripto reais
+//
+// Estado vazio: cada seção exibe "Sem lançamentos de [tipo]." quando
+// não há dados — sem fallback para valores fictícios.
+
 class PatrimonioTab extends StatelessWidget {
   const PatrimonioTab({super.key, required this.investments});
   final List<InvestmentModel> investments;
@@ -17,70 +114,48 @@ class PatrimonioTab extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final now = DateTime.now();
 
-    final labels = List.generate(
+    // ── Eixo de meses (últimos 12) ────────────────────────────────────────
+    final months = List.generate(
       12,
-      (i) => DateFormat('MM/yy').format(DateTime(now.year, now.month - 11 + i)),
+      (i) => DateTime(now.year, now.month - 11 + i),
     );
+    final labels =
+        months.map((m) => DateFormat('MM/yy').format(m)).toList();
 
-    final base = investments.fold<double>(
-        0, (sum, i) => sum + i.valorInvestido.abs());
-    final appliedSeed = base > 0 ? base / 12 : 920;
-    final gainSeed = base > 0 ? appliedSeed * 0.06 : 40;
-    final applied = List<double>.generate(
-        12, (i) => appliedSeed + (i * appliedSeed * 0.02));
-    final gain = List<double>.generate(
-        12, (i) => gainSeed + (i * gainSeed * 0.02));
+    // ── Evolução real do patrimônio ───────────────────────────────────────
+    final evolucao = _calcEvolucao(investments, months);
 
-    final dist = distributionByType(investments);
-    final palette = [
-      colorScheme.primary,
-      colorScheme.secondary,
-      colorScheme.tertiary,
-      colorScheme.primaryContainer,
-      colorScheme.secondaryContainer,
-      colorScheme.tertiaryContainer,
-    ];
-
-    final consolidacao = dist.isNotEmpty
-        ? dist.entries.toList().asMap().entries.map((e) {
-            final hue = (e.key * 360 / dist.length) % 360;
+    // ── Distribuição por tipo (consolidação geral) ────────────────────────
+    final distPorTipo = distributionByType(investments);
+    final consolidacao = distPorTipo.isNotEmpty
+        ? distPorTipo.entries.toList().asMap().entries.map((e) {
+            final hue = (e.key * 360 / distPorTipo.length) % 360;
             return LegendEntry(
               label: e.value.key,
               amount: e.value.value.abs(),
               color: HSVColor.fromAHSV(1, hue, 0.65, 0.85).toColor(),
             );
           }).toList()
-        : <LegendEntry>[
-            LegendEntry(label: 'Renda Fixa', amount: 601.15, color: palette[0]),
-            LegendEntry(label: 'Ações', amount: 237.82, color: palette[1]),
-            LegendEntry(label: 'FIIs', amount: 209.40, color: palette[2]),
-          ];
+        : <LegendEntry>[];
 
-    final acoes = <LegendEntry>[
-      LegendEntry(label: 'BBAS3', amount: 50.42, color: palette[0]),
-      LegendEntry(label: 'WEGE3', amount: 47.25, color: palette[1]),
-      LegendEntry(label: 'ITSA3', amount: 40.98, color: palette[2]),
-      LegendEntry(label: 'BBSE3', amount: 34.71, color: palette[3]),
-      LegendEntry(label: 'EGIE3', amount: 32.70, color: palette[4]),
-      LegendEntry(label: 'KLBN3', amount: 31.76, color: palette[5]),
-    ];
+    // ── Distribuição por ativo — Ações ────────────────────────────────────
+    final acoesData = _filterByTipo(investments, 'Ações');
+    final acoes = _toAtivoEntries(acoesData);
 
-    final fiis = <LegendEntry>[
-      LegendEntry(label: 'GARE11', amount: 41.75, color: palette[0]),
-      LegendEntry(label: 'VGIR11', amount: 39.08, color: palette[1]),
-      LegendEntry(label: 'BTCI11', amount: 36.96, color: palette[2]),
-      LegendEntry(label: 'VGHF11', amount: 35.25, color: palette[3]),
-      LegendEntry(label: 'XPCA11', amount: 34.88, color: palette[4]),
-      LegendEntry(label: 'VINO11', amount: 21.48, color: palette[5]),
-    ];
+    // ── Distribuição por ativo — FIIs ─────────────────────────────────────
+    final fiisData = _filterByTipo(investments, 'FIIs');
+    final fiis = _toAtivoEntries(fiisData);
 
-    final rendaFixa = <LegendEntry>[
-      LegendEntry(
-        label: 'CDB - BANCO NUBANK - Pós-Fixado - 100% CDI',
-        amount: 601.15,
-        color: palette[0],
-      ),
-    ];
+    // ── Distribuição por ativo — Renda Fixa ───────────────────────────────
+    final rendaFixaData = _filterByTipo(
+        investments, 'Renda Fixa (CDB,LCI,LCA,LC,LF,RDB)');
+    final rendaFixa = _toAtivoEntries(rendaFixaData);
+
+    // ── Totais por seção (para exibir no header de cada card) ─────────────
+    double somaAtivos(List<InvestmentModel> data) =>
+        data.fold(0.0, (s, i) => s + i.valorInvestido);
+
+    final fmt = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -108,19 +183,26 @@ class PatrimonioTab extends StatelessWidget {
                 Row(
                   children: [
                     LegendDot(
-                        color: colorScheme.tertiary, label: 'Valor aplicado'),
+                        color: colorScheme.tertiary,
+                        label: 'Valor acumulado'),
                     const SizedBox(width: 14),
                     LegendDot(
                         color: colorScheme.tertiaryContainer,
-                        label: 'Ganho capital'),
+                        label: 'Ganho estimado (0,5% a.m.)'),
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 260,
-                  child: PatrimonioBarChart(
-                      labels: labels, applied: applied, gain: gain),
-                ),
+                investments.isEmpty
+                    ? _emptyState(context,
+                        'Adicione lançamentos para ver a evolução do patrimônio.')
+                    : SizedBox(
+                        height: 260,
+                        child: PatrimonioBarChart(
+                          labels: labels,
+                          applied: evolucao.applied,
+                          gain: evolucao.gain,
+                        ),
+                      ),
               ],
             ),
           ),
@@ -141,7 +223,7 @@ class PatrimonioTab extends StatelessWidget {
                       options: const [
                         'Tipo de ativos',
                         'Ativos',
-                        'Exposição ao exterior'
+                        'Exposição ao exterior',
                       ],
                       selected: inv.patrimonioConsolidacao,
                       onChanged: (v) => context
@@ -149,7 +231,7 @@ class PatrimonioTab extends StatelessWidget {
                           .setPatrimonioConsolidacao(v),
                     ),
                     const SizedBox(width: 12),
-                    Text('Exibir posição ideal',
+                    Text('Posição ideal',
                         style: textTheme.bodySmall
                             ?.copyWith(color: colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 6),
@@ -163,8 +245,12 @@ class PatrimonioTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
-                    height: 240,
-                    child: DonutChartWithLegend(consolidacao)),
+                  height: 240,
+                  child: consolidacao.isEmpty
+                      ? _emptyState(context,
+                          'Sem lançamentos cadastrados para consolidar.')
+                      : DonutChartWithLegend(consolidacao),
+                ),
               ],
             ),
           ),
@@ -177,15 +263,26 @@ class PatrimonioTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('Ações',
-                        style: textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Ações',
+                            style: textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        if (acoesData.isNotEmpty)
+                          Text(
+                            'Total: ${fmt.format(somaAtivos(acoesData))} • ${acoesData.length} lançamento${acoesData.length != 1 ? 's' : ''}',
+                            style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
                     const Spacer(),
                     InvestmentSegmentedControl(
                       options: const [
                         'Consolidado',
                         'Por tipo',
-                        'Por segmento'
+                        'Por segmento',
                       ],
                       selected: inv.patrimonioAcoes,
                       onChanged: (v) => context
@@ -193,7 +290,7 @@ class PatrimonioTab extends StatelessWidget {
                           .setPatrimonioAcoes(v),
                     ),
                     const SizedBox(width: 12),
-                    Text('Exibir posição ideal',
+                    Text('Posição ideal',
                         style: textTheme.bodySmall
                             ?.copyWith(color: colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 6),
@@ -206,7 +303,13 @@ class PatrimonioTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(height: 240, child: DonutChartWithLegend(acoes)),
+                SizedBox(
+                  height: 240,
+                  child: acoes.isEmpty
+                      ? _emptyState(context,
+                          'Sem lançamentos de Ações. Adicione via "Adicionar lançamento".')
+                      : DonutChartWithLegend(acoes),
+                ),
               ],
             ),
           ),
@@ -219,15 +322,26 @@ class PatrimonioTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('FIIs',
-                        style: textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('FIIs',
+                            style: textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        if (fiisData.isNotEmpty)
+                          Text(
+                            'Total: ${fmt.format(somaAtivos(fiisData))} • ${fiisData.length} lançamento${fiisData.length != 1 ? 's' : ''}',
+                            style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
                     const Spacer(),
                     InvestmentSegmentedControl(
                       options: const [
                         'Consolidado',
                         'Por tipo',
-                        'Por segmento'
+                        'Por segmento',
                       ],
                       selected: inv.patrimonioFiis,
                       onChanged: (v) => context
@@ -235,7 +349,7 @@ class PatrimonioTab extends StatelessWidget {
                           .setPatrimonioFiis(v),
                     ),
                     const SizedBox(width: 12),
-                    Text('Exibir posição ideal',
+                    Text('Posição ideal',
                         style: textTheme.bodySmall
                             ?.copyWith(color: colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 6),
@@ -248,7 +362,13 @@ class PatrimonioTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(height: 240, child: DonutChartWithLegend(fiis)),
+                SizedBox(
+                  height: 240,
+                  child: fiis.isEmpty
+                      ? _emptyState(context,
+                          'Sem lançamentos de FIIs. Adicione via "Adicionar lançamento".')
+                      : DonutChartWithLegend(fiis),
+                ),
               ],
             ),
           ),
@@ -261,11 +381,22 @@ class PatrimonioTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('Renda Fixa',
-                        style: textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Renda Fixa',
+                            style: textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        if (rendaFixaData.isNotEmpty)
+                          Text(
+                            'Total: ${fmt.format(somaAtivos(rendaFixaData))} • ${rendaFixaData.length} lançamento${rendaFixaData.length != 1 ? 's' : ''}',
+                            style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant),
+                          ),
+                      ],
+                    ),
                     const Spacer(),
-                    Text('Exibir posição ideal',
+                    Text('Posição ideal',
                         style: textTheme.bodySmall
                             ?.copyWith(color: colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 6),
@@ -278,9 +409,41 @@ class PatrimonioTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(height: 240, child: DonutChartWithLegend(rendaFixa)),
+                SizedBox(
+                  height: 240,
+                  child: rendaFixa.isEmpty
+                      ? _emptyState(context,
+                          'Sem lançamentos de Renda Fixa. Adicione via "Adicionar lançamento".')
+                      : DonutChartWithLegend(rendaFixa),
+                ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Widget de estado vazio padronizado ────────────────────────────────────
+
+  Widget _emptyState(BuildContext context, String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.bar_chart_outlined,
+            size: 40,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),
