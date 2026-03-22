@@ -6,13 +6,21 @@ import 'package:financas_inteligentes/services/firestore_service.dart';
 
 /// Estado centralizado das transações financeiras.
 ///
-/// Usa [ErrorHandlerMixin] para padronizar o tratamento de erros:
-/// - `appError` → [AppError] tipado (substitui `String? _error`)
-/// - `runSafe` / `runSafeVoid` → try/catch padronizado
+/// ## Filtro por período (P3-A)
+///   - [periodoSelecionado] → mês/ano exibido na tela (padrão: mês corrente)
+///   - [transactions] → lista completa, ordenada por data desc
+///   - [transactionsFiltradas] → lista filtrada pelo período selecionado
+///   - [totalEntradas], [totalSaidas], [saldo] → calculados sobre o período
+///   - [mesesDisponiveis] → lista de meses com pelo menos 1 transação
+///   - [irParaMesAnterior] / [irParaProximoMes] → navegação rápida
 class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   final FirestoreService _service;
 
   TransactionProvider(this._service) {
+    _periodoSelecionado = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+    );
     _startListening();
   }
 
@@ -23,7 +31,10 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   List<TransactionModel> _transactions = [];
   bool _isLoading = true;
 
-  // Calculados do mês corrente
+  // Período selecionado (apenas ano + mês)
+  late DateTime _periodoSelecionado;
+
+  // Calculados sobre o período selecionado
   double _totalEntradas = 0;
   double _totalSaidas   = 0;
   double _totalSuperfluos = 0;
@@ -31,16 +42,26 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   Map<String, double> _saidasPorCategoria   = {};
 
   // Estado do formulário
-  String _tipo      = 'entrada';
-  String _categoria = '';
-  bool   _fixa      = false;
-  bool   _superfluo = false;
+  String _tipo         = 'entrada';
+  String _categoria    = '';
+  bool   _fixa         = false;
+  bool   _superfluo    = false;
   bool   _isSubmitting = false;
 
   // ── Getters ───────────────────────────────────────────────────────────────
 
+  /// Todas as transações (sem filtro de período), ordenadas por data desc.
   List<TransactionModel> get transactions => _transactions;
+
+  /// Transações filtradas pelo [periodoSelecionado].
+  List<TransactionModel> get transactionsFiltradas => _transactions
+      .where((t) =>
+          t.data.month == _periodoSelecionado.month &&
+          t.data.year == _periodoSelecionado.year)
+      .toList();
+
   bool get isLoading     => _isLoading;
+  DateTime get periodoSelecionado => _periodoSelecionado;
 
   double get totalEntradas   => _totalEntradas;
   double get totalSaidas     => _totalSaidas;
@@ -50,19 +71,44 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   Map<String, double> get entradasPorCategoria => _entradasPorCategoria;
   Map<String, double> get saidasPorCategoria   => _saidasPorCategoria;
 
-  String get tipo      => _tipo;
-  String get categoria => _categoria;
-  bool   get fixa      => _fixa;
-  bool   get superfluo => _superfluo;
+  String get tipo         => _tipo;
+  String get categoria    => _categoria;
+  bool   get fixa         => _fixa;
+  bool   get superfluo    => _superfluo;
   bool   get isSubmitting => _isSubmitting;
 
-  bool   get gastosAltos => _totalSuperfluos > _totalSaidas * 0.3;
+  bool get gastosAltos => _totalSuperfluos > _totalSaidas * 0.3;
 
-  String get analiseGastos {
-    if (gastosAltos) {
-      return 'Você gastou muito em supérfluos. Revise gastos variáveis para equilibrar o mês.';
+  String get analiseGastos => gastosAltos
+      ? 'Você gastou muito em supérfluos. Revise gastos variáveis para equilibrar o mês.'
+      : 'Bons gastos! Supérfluos sob controle.';
+
+  /// Lista de meses distintos com pelo menos 1 transação, ordem decrescente.
+  List<DateTime> get mesesDisponiveis {
+    final meses = <DateTime>{};
+    for (final t in _transactions) {
+      meses.add(DateTime(t.data.year, t.data.month));
     }
-    return 'Bons gastos! Supérfluos sob controle.';
+    final lista = meses.toList()..sort((a, b) => b.compareTo(a));
+    // Garante que o mês atual sempre aparece (mesmo sem transações)
+    final mesAtual = DateTime(DateTime.now().year, DateTime.now().month);
+    if (!lista.contains(mesAtual)) lista.insert(0, mesAtual);
+    return lista;
+  }
+
+  /// True se o período selecionado é o mês corrente.
+  bool get isPeriodoAtual {
+    final now = DateTime.now();
+    return _periodoSelecionado.year == now.year &&
+        _periodoSelecionado.month == now.month;
+  }
+
+  /// True se há um mês mais recente disponível para navegar.
+  bool get temProximoMes {
+    final now = DateTime.now();
+    return _periodoSelecionado.year < now.year ||
+        (_periodoSelecionado.year == now.year &&
+            _periodoSelecionado.month < now.month);
   }
 
   // ── Categorias ────────────────────────────────────────────────────────────
@@ -85,6 +131,35 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   List<String> get categoriasAtuais =>
       _tipo == 'entrada' ? categoriasEntrada : categoriasSaida;
 
+  // ── Navegação de período ──────────────────────────────────────────────────
+
+  void setPeriodo(DateTime mes) {
+    _periodoSelecionado = DateTime(mes.year, mes.month);
+    _recalcular();
+    notifyListeners();
+  }
+
+  void irParaMesAnterior() {
+    final anterior = DateTime(
+      _periodoSelecionado.year,
+      _periodoSelecionado.month - 1,
+    );
+    setPeriodo(anterior);
+  }
+
+  void irParaProximoMes() {
+    if (!temProximoMes) return;
+    final proximo = DateTime(
+      _periodoSelecionado.year,
+      _periodoSelecionado.month + 1,
+    );
+    setPeriodo(proximo);
+  }
+
+  void irParaMesAtual() {
+    setPeriodo(DateTime(DateTime.now().year, DateTime.now().month));
+  }
+
   // ── Stream ────────────────────────────────────────────────────────────────
 
   void _startListening() {
@@ -103,17 +178,19 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   void _onTransactionsReceived(List<TransactionModel> raw) {
     _transactions = List.from(raw)
       ..sort((a, b) => b.data.compareTo(a.data));
+    _isLoading = false;
+    setAppError(null);
+    _recalcular();
+    notifyListeners();
+  }
 
-    final now = DateTime.now();
-    final mesAtual = _transactions.where(
-      (t) => t.data.month == now.month && t.data.year == now.year,
-    );
-
+  /// Recalcula totais e categorias para o [periodoSelecionado] atual.
+  void _recalcular() {
     final Map<String, double> entradas = {};
     final Map<String, double> saidas   = {};
     double te = 0, ts = 0, tsp = 0;
 
-    for (final t in mesAtual) {
+    for (final t in transactionsFiltradas) {
       if (t.tipo == 'entrada') {
         te += t.valor;
         entradas.update(t.categoria, (v) => v + t.valor,
@@ -126,14 +203,11 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
       if (t.superfluo) tsp += t.valor;
     }
 
-    _totalEntradas          = te;
-    _totalSaidas            = ts;
-    _totalSuperfluos        = tsp;
-    _entradasPorCategoria   = entradas;
-    _saidasPorCategoria     = saidas;
-    _isLoading              = false;
-    setAppError(null);
-    notifyListeners();
+    _totalEntradas        = te;
+    _totalSaidas          = ts;
+    _totalSuperfluos      = tsp;
+    _entradasPorCategoria = entradas;
+    _saidasPorCategoria   = saidas;
   }
 
   void reload() => _startListening();
@@ -141,7 +215,7 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   // ── Formulário ────────────────────────────────────────────────────────────
 
   void setTipo(String value) {
-    _tipo = value;
+    _tipo      = value;
     _categoria = '';
     notifyListeners();
   }

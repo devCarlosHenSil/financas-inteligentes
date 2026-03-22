@@ -5,15 +5,13 @@ import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-/// Tela de transações.
+/// Tela de transações com filtro por período (P3-A).
 ///
-/// Migração:
-///   - Removido: StreamBuilder direto no build, FirestoreService local,
-///     variáveis de estado tipo/categoria/fixa/superfluo com setState.
-///   - Agora: lê TransactionProvider via context.watch.
-///   - Estado local mantido: valorController (TextEditingController),
-///     _touchEdit (estado do dialog de edição).
-///   - O provider já entrega a lista ordenada por data desc.
+/// Novidades:
+///   - [_buildPeriodoSelector] → navegação ← mês/ano → com seta e picker
+///   - Lista exibe apenas [tx.transactionsFiltradas] (período selecionado)
+///   - Totais (entradas/saídas/saldo) refletem o período selecionado
+///   - Botão "Hoje" volta para o mês corrente quando em mês diferente
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
 
@@ -24,8 +22,8 @@ class TransactionsScreen extends StatefulWidget {
 class TransactionsScreenState extends State<TransactionsScreen> {
   final NumberFormat _currency = NumberFormat.currency(symbol: 'R\$');
   final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
+  final DateFormat _mesFormat  = DateFormat('MMMM yyyy', 'pt_BR');
 
-  // Controller do campo valor — estado local de UI puro
   final MoneyMaskedTextController _valorController = MoneyMaskedTextController(
     decimalSeparator: ',',
     thousandSeparator: '.',
@@ -73,10 +71,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       initialValue: trans.valor,
     );
 
-    String editTipo = trans.tipo;
+    String editTipo      = trans.tipo;
     String editCategoria = trans.categoria;
-    bool editFixa = trans.fixa;
-    bool editSuperfluo = trans.superfluo;
+    bool   editFixa      = trans.fixa;
+    bool   editSuperfluo = trans.superfluo;
 
     showDialog(
       context: context,
@@ -103,28 +101,23 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       initialValue: editTipo,
                       decoration: const InputDecoration(labelText: 'Tipo'),
                       items: const [
-                        DropdownMenuItem(
-                            value: 'entrada', child: Text('Entrada')),
-                        DropdownMenuItem(
-                            value: 'saida', child: Text('Saída')),
+                        DropdownMenuItem(value: 'entrada', child: Text('Entrada')),
+                        DropdownMenuItem(value: 'saida',   child: Text('Saída')),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
                         setDialogState(() {
-                          editTipo = v;
+                          editTipo      = v;
                           editCategoria = '';
                         });
                       },
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      initialValue:
-                          editCategoria.isEmpty ? null : editCategoria,
-                      decoration:
-                          const InputDecoration(labelText: 'Categoria'),
+                      initialValue: editCategoria.isEmpty ? null : editCategoria,
+                      decoration: const InputDecoration(labelText: 'Categoria'),
                       items: categorias
-                          .map((e) =>
-                              DropdownMenuItem(value: e, child: Text(e)))
+                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (v) =>
                           setDialogState(() => editCategoria = v ?? ''),
@@ -157,17 +150,16 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       );
                       return;
                     }
-                    // Usa o provider para atualizar — sem acesso direto ao service
                     await context.read<TransactionProvider>().updateTransaction(
                           trans.id,
                           TransactionModel(
-                            id: trans.id,
-                            valor: editValor.numberValue,
-                            tipo: editTipo,
-                            categoria: editCategoria,
-                            fixa: editFixa,
-                            data: trans.data,
-                            superfluo: editSuperfluo,
+                            id:         trans.id,
+                            valor:      editValor.numberValue,
+                            tipo:       editTipo,
+                            categoria:  editCategoria,
+                            fixa:       editFixa,
+                            data:       trans.data,
+                            superfluo:  editSuperfluo,
                           ),
                         );
                     if (!context.mounted) return;
@@ -183,11 +175,160 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     ).then((_) => editValor.dispose());
   }
 
+  // ── Seletor de período ────────────────────────────────────────────────────
+
+  /// Abre um diálogo com lista dos meses disponíveis para selecionar.
+  Future<void> _showMesPicker(TransactionProvider tx) async {
+    final meses = tx.mesesDisponiveis;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecionar período'),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        content: SizedBox(
+          width: 280,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: meses.length,
+            itemBuilder: (context, index) {
+              final mes = meses[index];
+              final isSelected =
+                  mes.month == tx.periodoSelecionado.month &&
+                  mes.year  == tx.periodoSelecionado.year;
+              final label = DateFormat('MMMM yyyy', 'pt_BR').format(mes);
+              final count = tx.transactions
+                  .where((t) =>
+                      t.data.month == mes.month && t.data.year == mes.year)
+                  .length;
+
+              return ListTile(
+                selected: isSelected,
+                selectedColor: Theme.of(context).colorScheme.primary,
+                selectedTileColor: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.08),
+                leading: isSelected
+                    ? Icon(Icons.radio_button_checked,
+                        color: Theme.of(context).colorScheme.primary)
+                    : const Icon(Icons.radio_button_unchecked),
+                title: Text(
+                  label[0].toUpperCase() + label.substring(1),
+                  style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+                trailing: count > 0
+                    ? Text(
+                        '$count',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      )
+                    : null,
+                onTap: () {
+                  context.read<TransactionProvider>().setPeriodo(mes);
+                  Navigator.pop(context);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodoSelector(TransactionProvider tx) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme   = Theme.of(context).textTheme;
+    final label       = _mesFormat.format(tx.periodoSelecionado);
+    final labelFmt    = label[0].toUpperCase() + label.substring(1);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ← mês anterior
+        IconButton(
+          tooltip: 'Mês anterior',
+          icon: const Icon(Icons.chevron_left),
+          color: colorScheme.onPrimary,
+          onPressed: tx.irParaMesAnterior,
+        ),
+
+        // Label clicável — abre picker
+        GestureDetector(
+          onTap: () => _showMesPicker(tx),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.calendar_month_outlined,
+                    size: 16, color: colorScheme.onPrimary),
+                const SizedBox(width: 6),
+                Text(
+                  labelFmt,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down,
+                    size: 18, color: colorScheme.onPrimary),
+              ],
+            ),
+          ),
+        ),
+
+        // → mês seguinte (oculto quando já está no mês atual)
+        IconButton(
+          tooltip: 'Próximo mês',
+          icon: const Icon(Icons.chevron_right),
+          color: tx.temProximoMes
+              ? colorScheme.onPrimary
+              : colorScheme.onPrimary.withValues(alpha: 0.3),
+          onPressed: tx.temProximoMes ? tx.irParaProximoMes : null,
+        ),
+
+        // Botão "Hoje" — só aparece quando não está no mês atual
+        if (!tx.isPeriodoAtual)
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onPrimary,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            onPressed: tx.irParaMesAtual,
+            child: const Text('Hoje'),
+          ),
+      ],
+    );
+  }
+
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() {
+  Widget _buildHeader(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme   = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -195,43 +336,50 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: colorScheme.surface,
-            child: Icon(Icons.receipt_long, color: colorScheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Transações',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: colorScheme.surface,
+                child: Icon(Icons.receipt_long, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Transações',
+                      style: textTheme.titleLarge?.copyWith(
+                        color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Gerencie entradas e saídas com visão premium.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  'Gerencie entradas e saídas com visão premium.',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 12),
+          // Seletor de período centralizado abaixo do título
+          Center(child: _buildPeriodoSelector(tx)),
         ],
       ),
     );
   }
 
-  Widget _buildSummary() {
+  Widget _buildSummary(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    // Lê totais pré-calculados do provider — sem recalcular na tela
-    final tx = context.watch<TransactionProvider>();
+    final textTheme   = Theme.of(context).textTheme;
+    final count       = tx.transactionsFiltradas.length;
 
     Widget card(String label, double value, Color color) {
       return Expanded(
@@ -261,21 +409,35 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       );
     }
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        card('Entradas', tx.totalEntradas, colorScheme.tertiary),
-        const SizedBox(width: 10),
-        card('Saídas', tx.totalSaidas, colorScheme.error),
-        const SizedBox(width: 10),
-        card('Saldo', tx.saldo, colorScheme.primary),
+        Row(
+          children: [
+            card('Entradas', tx.totalEntradas, colorScheme.tertiary),
+            const SizedBox(width: 10),
+            card('Saídas', tx.totalSaidas, colorScheme.error),
+            const SizedBox(width: 10),
+            card('Saldo', tx.saldo, colorScheme.primary),
+          ],
+        ),
+        if (count > 0) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '$count transaç${count == 1 ? 'ão' : 'ões'} no período',
+              style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.7)),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
-    // context.watch → rebuild do form quando provider notifica (tipo, categoria, etc.)
-    final tx = context.watch<TransactionProvider>();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -310,7 +472,6 @@ class TransactionsScreenState extends State<TransactionsScreen> {
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            // key garante reset do dropdown quando o tipo muda
             key: ValueKey('cat_${tx.tipo}'),
             initialValue: tx.categoria.isEmpty ? null : tx.categoria,
             decoration: const InputDecoration(labelText: 'Categoria'),
@@ -356,7 +517,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
   Widget _buildTile(TransactionModel t) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isEntrada = t.tipo == 'entrada';
+    final isEntrada   = t.tipo == 'entrada';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -392,8 +553,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              onPressed: () =>
-                  context.read<TransactionProvider>().deleteTransaction(t.id),
+              onPressed: () => context
+                  .read<TransactionProvider>()
+                  .deleteTransaction(t.id),
             ),
           ],
         ),
@@ -406,9 +568,10 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // context.watch → rebuild quando a lista de transações muda
-    final tx = context.watch<TransactionProvider>();
-    final data = tx.transactions;
+    final tx          = context.watch<TransactionProvider>();
+
+    // Lista filtrada pelo período selecionado
+    final data = tx.transactionsFiltradas;
 
     return Scaffold(
       body: Container(
@@ -428,9 +591,24 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
                 final Widget listWidget = data.isEmpty
                     ? Center(
-                        child: Text(
-                          'Sem transações ainda.',
-                          style: TextStyle(color: colorScheme.onPrimary),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 48,
+                              color: colorScheme.onPrimary
+                                  .withValues(alpha: 0.4),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Sem transações em ${DateFormat('MMMM yyyy', 'pt_BR').format(tx.periodoSelecionado)}.',
+                              style: TextStyle(
+                                  color: colorScheme.onPrimary
+                                      .withValues(alpha: 0.7)),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       )
                     : ListView.builder(
@@ -441,9 +619,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
                 return Column(
                   children: [
-                    _buildHeader(),
+                    _buildHeader(tx),
                     const SizedBox(height: 10),
-                    _buildSummary(),
+                    _buildSummary(tx),
                     const SizedBox(height: 10),
                     Expanded(
                       child: isWide
@@ -452,7 +630,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                               children: [
                                 Expanded(
                                   child: SingleChildScrollView(
-                                      child: _buildForm()),
+                                      child: _buildForm(tx)),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: listWidget),
@@ -460,7 +638,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             )
                           : Column(
                               children: [
-                                _buildForm(),
+                                _buildForm(tx),
                                 const SizedBox(height: 10),
                                 Expanded(child: listWidget),
                               ],

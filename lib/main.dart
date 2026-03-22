@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:financas_inteligentes/providers/app_providers.dart';
 import 'package:financas_inteligentes/screens/login_screen.dart';
 import 'package:financas_inteligentes/screens/dashboard_screen.dart';
@@ -12,10 +13,12 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Inicializa dados de locale pt_BR para DateFormat funcionar em todas as plataformas
+  await initializeDateFormatting('pt_BR');
+
   String? startupError;
   try {
-    await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   } catch (error) {
     startupError = error.toString();
   }
@@ -47,12 +50,12 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.system,
-        debugShowCheckedModeBanner: false,
+        // _AuthGate escuta authStateChanges e decide Login x Dashboard
         home: hasStartupError
             ? _StartupErrorScreen(message: startupError!)
             : const _AuthGate(),
         routes: {
-          '/login': (context) => const LoginScreen(),
+          '/login':     (context) => const LoginScreen(),
           '/dashboard': (context) => const DashboardScreen(),
         },
       ),
@@ -62,19 +65,12 @@ class MyApp extends StatelessWidget {
 
 // ── AuthGate ──────────────────────────────────────────────────────────────────
 //
-// Escuta authStateChanges do Firebase via AuthProvider e decide qual tela
-// exibir sem depender de Navigator.pushReplacementNamed nas telas filhas.
+// Escuta FirebaseAuth.authStateChanges() e redireciona automaticamente:
+//   - null  → LoginScreen
+//   - User  → DashboardScreen
 //
-// Fluxo:
-//   - null (não autenticado)  → LoginScreen
-//   - User  (autenticado)     → DashboardScreen
-//   - Transição               → SplashScreen (evita flash de tela errada)
-//
-// Por que usar StreamBuilder aqui em vez de apenas context.watch<AuthProvider>:
-//   O AuthProvider inicializa com FirebaseAuth.instance.currentUser no construtor,
-//   mas o stream pode ainda estar carregando na primeira frame. O StreamBuilder
-//   garante que a decisão seja sempre baseada no estado mais recente do Firebase,
-//   não no snapshot inicial do provider.
+// Garante que após signIn o usuário vai para o Dashboard sem Navigator.push
+// manual, e após signOut volta para Login sem referência stale.
 
 class _AuthGate extends StatelessWidget {
   const _AuthGate();
@@ -84,22 +80,15 @@ class _AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Aguardando resposta do Firebase (primeira frame)
+        // Aguarda a primeira emissão do stream (verificação de sessão)
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const _SplashScreen();
         }
 
-        // Erro no stream de autenticação — exibe tela de login por segurança
-        if (snapshot.hasError) {
-          return const LoginScreen();
-        }
-
-        // Usuário autenticado → Dashboard
-        if (snapshot.hasData && snapshot.data != null) {
+        final user = snapshot.data;
+        if (user != null) {
           return const DashboardScreen();
         }
-
-        // Não autenticado → Login
         return const LoginScreen();
       },
     );
@@ -107,10 +96,6 @@ class _AuthGate extends StatelessWidget {
 }
 
 // ── SplashScreen ──────────────────────────────────────────────────────────────
-//
-// Exibida apenas durante a verificação inicial do estado de autenticação
-// (tipicamente < 300ms). Evita o "flash" de LoginScreen para DashboardScreen
-// em usuários que já estavam logados.
 
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
@@ -119,24 +104,20 @@ class _SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.primary,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.account_balance_wallet_rounded,
-              size: 56,
-              color: colorScheme.primary,
+              size: 64,
+              color: colorScheme.onPrimary,
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: colorScheme.primary,
-              ),
+            CircularProgressIndicator(
+              color: colorScheme.onPrimary,
+              strokeWidth: 2,
             ),
           ],
         ),
@@ -145,8 +126,6 @@ class _SplashScreen extends StatelessWidget {
   }
 }
 
-// ── StartupErrorScreen ────────────────────────────────────────────────────────
-
 class _StartupErrorScreen extends StatelessWidget {
   const _StartupErrorScreen({required this.message});
 
@@ -154,8 +133,7 @@ class _StartupErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFirebaseWebImportError =
-        kIsWeb && message.contains('firebasejs/');
+    final isFirebaseWebImportError = kIsWeb && message.contains('firebasejs/');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Falha ao iniciar app')),
@@ -184,8 +162,7 @@ class _StartupErrorScreen extends StatelessWidget {
               ),
               child: SelectableText(
                 message,
-                style:
-                    const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
             ),
             const SizedBox(height: 12),
