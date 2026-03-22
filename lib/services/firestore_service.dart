@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:financas_inteligentes/models/budget_model.dart';
 import 'package:financas_inteligentes/models/goal_model.dart';
 import 'package:financas_inteligentes/models/investment_model.dart';
 import 'package:financas_inteligentes/models/provento_model.dart';
@@ -210,5 +211,56 @@ class FirestoreService {
             snapshot.docs
                 .map((doc) => GoalModel.fromMap(doc.data(), doc.id))
                 .toList());
+  }
+
+  // ── Orçamentos por Categoria ──────────────────────────────────────────────
+
+  Future<void> addBudget(BudgetModel budget) async {
+    await _col('orcamentos').add(budget.toMap());
+  }
+
+  Future<void> updateBudget(String id, BudgetModel budget) async {
+    await _col('orcamentos').doc(id).update(budget.toMap());
+  }
+
+  Future<void> deleteBudget(String id) async {
+    await _col('orcamentos').doc(id).delete();
+  }
+
+  /// Retorna todos os orçamentos de um mês/ano específico.
+  Stream<List<BudgetModel>> getBudgets(DateTime mes) {
+    final inicio = Timestamp.fromDate(DateTime(mes.year, mes.month));
+    final fim    = Timestamp.fromDate(DateTime(mes.year, mes.month + 1));
+    return _col('orcamentos')
+        .where('mes', isGreaterThanOrEqualTo: inicio)
+        .where('mes', isLessThan: fim)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => BudgetModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Copia orçamentos de um mês para outro (útil para replicar configuração).
+  Future<void> copiarOrcamentos(DateTime deMes, DateTime paraMes) async {
+    final snap = await _col('orcamentos')
+        .where('mes',
+            isGreaterThanOrEqualTo:
+                Timestamp.fromDate(DateTime(deMes.year, deMes.month)))
+        .where('mes',
+            isLessThan:
+                Timestamp.fromDate(DateTime(deMes.year, deMes.month + 1)))
+        .get();
+
+    if (snap.docs.isEmpty) return;
+    final batch = db.batch();
+    final col   = _col('orcamentos');
+    for (final doc in snap.docs) {
+      final original = BudgetModel.fromMap(doc.data(), doc.id);
+      batch.set(
+        col.doc(),
+        original.copyWith(mes: DateTime(paraMes.year, paraMes.month)).toMap(),
+      );
+    }
+    await batch.commit();
   }
 }

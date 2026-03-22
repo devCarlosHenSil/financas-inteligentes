@@ -1,6 +1,8 @@
 import 'package:financas_inteligentes/providers/auth_provider.dart';
+import 'package:financas_inteligentes/providers/budget_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
+import 'package:financas_inteligentes/screens/budget_screen.dart';
 import 'package:financas_inteligentes/screens/goals_screen.dart';
 import 'package:financas_inteligentes/screens/investments_screen.dart';
 import 'package:financas_inteligentes/screens/notification_settings_screen.dart';
@@ -430,6 +432,119 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Mini-widget de orçamento exibido no Dashboard: alertas + botão rápido.
+  Widget _buildBudgetMiniWidget() {
+    final budget = context.watch<BudgetProvider>();
+    final cs     = Theme.of(context).colorScheme;
+    final tt     = Theme.of(context).textTheme;
+
+    // Sincroniza gastos do período atual
+    final gastos = context.watch<TransactionProvider>().saidasPorCategoria;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<BudgetProvider>().atualizarGastos(gastos);
+    });
+
+    if (budget.budgetsComGasto.isEmpty) return const SizedBox.shrink();
+
+    final alertas   = budget.totalAlertas;
+    final progresso = budget.progressoGeral;
+    final corBarra  = progresso >= 1.0
+        ? cs.error
+        : progresso >= 0.75
+            ? Colors.orange
+            : cs.primary;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BudgetScreen()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                alertas > 0
+                    ? Icons.warning_amber_outlined
+                    : Icons.account_balance_outlined,
+                color: alertas > 0 ? cs.error : cs.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Orçamento mensal',
+                            style: tt.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        if (alertas > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: cs.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$alertas alerta${alertas != 1 ? 's' : ''}',
+                              style: tt.labelSmall?.copyWith(
+                                  color: cs.error,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(
+                            begin: 0, end: progresso.clamp(0.0, 1.0)),
+                        duration: const Duration(milliseconds: 700),
+                        builder: (_, v, __) => LinearProgressIndicator(
+                          value: v,
+                          minHeight: 5,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(corBarra),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${(progresso * 100).toStringAsFixed(0)}%',
+                    style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800, color: corBarra),
+                  ),
+                  Text(
+                    '${budget.budgetsComGasto.length} categoria${budget.budgetsComGasto.length != 1 ? 's' : ''}',
+                    style: tt.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInsightsAndActions(double saldo) {
     final colorScheme   = Theme.of(context).colorScheme;
     final textTheme     = Theme.of(context).textTheme;
@@ -446,6 +561,10 @@ class DashboardScreenState extends State<DashboardScreen> {
         _buildGoalsMiniWidget(),
         if (context.watch<GoalProvider>().activeGoals.isNotEmpty)
           const SizedBox(height: 8),
+
+        // ── Mini-widget de orçamento ──────────────────────────────────────
+        _buildBudgetMiniWidget(),
+        const SizedBox(height: 8),
 
         // ── Cards de insight ─────────────────────────────────────────────
         Row(
@@ -532,6 +651,23 @@ class DashboardScreenState extends State<DashboardScreen> {
                 label: 'Metas',
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BudgetScreen()),
+                ),
+                icon: Icons.account_balance_outlined,
+                label: 'Orçamento',
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(child: SizedBox()),
           ],
         ),
       ],

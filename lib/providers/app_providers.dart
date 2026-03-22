@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:financas_inteligentes/providers/auth_provider.dart';
+import 'package:financas_inteligentes/providers/budget_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/investment_provider.dart';
 import 'package:financas_inteligentes/providers/notification_provider.dart';
@@ -82,6 +83,13 @@ class AppProviders extends StatelessWidget {
           create: (ctx) => GoalProvider(ctx.read<FirestoreService>()),
           update: (ctx, service, previous) =>
               previous ?? GoalProvider(service),
+        ),
+
+        // BudgetProvider — orçamentos mensais por categoria
+        ChangeNotifierProxyProvider<FirestoreService, BudgetProvider>(
+          create: (ctx) => BudgetProvider(ctx.read<FirestoreService>()),
+          update: (ctx, service, previous) =>
+              previous ?? BudgetProvider(service),
         ),
 
         // NotificationProvider — notificações locais de dividendos e metas
