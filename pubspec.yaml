@@ -29,6 +29,9 @@ dependencies:
   # Notificações locais agendadas
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
+  # Geração e exportação de relatórios PDF
+  pdf: ^3.11.1
+  printing: ^5.13.2
 
 dev_dependencies:
   flutter_test:

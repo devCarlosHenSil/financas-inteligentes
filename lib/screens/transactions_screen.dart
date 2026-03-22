@@ -1,5 +1,6 @@
 import 'package:financas_inteligentes/models/transaction_model.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
+import 'package:financas_inteligentes/services/report_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:intl/intl.dart';
@@ -366,6 +367,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                   ],
                 ),
               ),
+              // Botão exportar PDF
+              _ExportarPdfButton(tx: tx),
             ],
           ),
           const SizedBox(height: 12),
@@ -650,6 +653,65 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Widget de exportação PDF ───────────────────────────────────────────────────
+
+class _ExportarPdfButton extends StatefulWidget {
+  const _ExportarPdfButton({required this.tx});
+  final TransactionProvider tx;
+
+  @override
+  State<_ExportarPdfButton> createState() => _ExportarPdfButtonState();
+}
+
+class _ExportarPdfButtonState extends State<_ExportarPdfButton> {
+  bool _gerando = false;
+
+  Future<void> _exportar() async {
+    if (_gerando) return;
+    setState(() => _gerando = true);
+    try {
+      await ReportService.exportarTransacoes(
+        periodo:              widget.tx.periodoSelecionado,
+        transacoes:           widget.tx.transactionsFiltradas,
+        totalEntradas:        widget.tx.totalEntradas,
+        totalSaidas:          widget.tx.totalSaidas,
+        saldo:                widget.tx.saldo,
+        entradasPorCategoria: widget.tx.entradasPorCategoria,
+        saidasPorCategoria:   widget.tx.saidasPorCategoria,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao gerar PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _gerando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Exportar PDF do período',
+      child: IconButton(
+        onPressed: _gerando ? null : _exportar,
+        icon: _gerando
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+            : Icon(Icons.picture_as_pdf_outlined, color: colorScheme.onPrimary),
       ),
     );
   }
