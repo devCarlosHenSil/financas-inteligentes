@@ -1,3 +1,16 @@
+/**
+ * Cloudflare Worker — Proxy BRAPI
+ *
+ * Rotas disponíveis:
+ *   GET /brapiQuoteList   → /quote/list
+ *   GET /brapiQuote       → /quote/:symbols  (param: symbols)
+ *   GET /brapiCurrency    → /v2/currency      (param: currency)
+ *   GET /brapiCrypto      → /v2/crypto        (params: coin, currency)
+ *
+ * Secret necessário (configurar via wrangler):
+ *   npx wrangler secret put BRAPI_TOKEN
+ */
+
 const BRAPI_BASE_URL = "https://brapi.dev/api";
 
 const corsHeaders = {
@@ -34,6 +47,7 @@ export default {
     const route = incoming.pathname.replace(/^\//, "");
 
     let brapiPath = null;
+
     if (route === "brapiQuoteList") {
       brapiPath = "/quote/list";
     } else if (route === "brapiQuote") {
@@ -43,8 +57,17 @@ export default {
       }
       brapiPath = `/quote/${encodeURIComponent(symbols)}`;
     } else if (route === "brapiCurrency") {
+      const currency = incoming.searchParams.get("currency");
+      if (!currency) {
+        return jsonResponse({ error: true, message: "currency is required" }, 400);
+      }
       brapiPath = "/v2/currency";
     } else if (route === "brapiCrypto") {
+      const coin = incoming.searchParams.get("coin");
+      const currency = incoming.searchParams.get("currency");
+      if (!coin || !currency) {
+        return jsonResponse({ error: true, message: "coin and currency are required" }, 400);
+      }
       brapiPath = "/v2/crypto";
     } else {
       return jsonResponse({ error: true, message: "Not found" }, 404);
@@ -64,6 +87,20 @@ export default {
           Authorization: `Bearer ${env.BRAPI_TOKEN}`,
         },
       });
+
+      // Trata 401/403 da BRAPI de forma padronizada.
+      // O cliente Flutter detecta via _isBrapiFeatureUnavailable e ativa o fallback.
+      if (response.status === 401 || response.status === 403) {
+        return jsonResponse(
+          {
+            error: true,
+            message: "Recurso indisponível no plano atual",
+            code: "FEATURE_NOT_AVAILABLE",
+          },
+          200 // retorna 200 para que o Flutter faça o parse normalmente
+        );
+      }
+
       const body = await response.text();
       const headers = new Headers(corsHeaders);
       const contentType = response.headers.get("content-type");
