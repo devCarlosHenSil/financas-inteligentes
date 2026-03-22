@@ -26,23 +26,17 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^3.0.0
   provider: ^6.1.2
-  # Notificacoes locais agendadas
+  # Notificações locais agendadas
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
-  # Geracao e exportacao de relatorios PDF
+  # Geração e impressão de relatórios PDF
   pdf: ^3.11.1
-  printing: ^5.13.2
-  # Login social
-  google_sign_in: ^6.2.2
-  sign_in_with_apple: ^6.1.4
+  printing: ^5.13.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  # Testes automatizados
-  mockito: ^5.4.4
-  build_runner: ^2.4.12
 
 flutter:
   uses-material-design: true
