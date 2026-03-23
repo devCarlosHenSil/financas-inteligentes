@@ -117,6 +117,9 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
     'Crédito de Salário',
     'Adiantamento de Salário',
     'Pagamento de Benefícios',
+    'Pagamento freelancer',
+    'Transferência entre contas',
+    'Recebimento de Terceiros',
   ];
 
   static const List<String> categoriasSaida = [
@@ -128,8 +131,18 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
     'Uber', 'Outros',
   ];
 
+  final List<String> _categoriasEntradaCustom = [];
+  final List<String> _categoriasSaidaCustom   = [];
+
+  List<String> categoriasForTipo(String tipo) {
+    final base = tipo == 'entrada' ? categoriasEntrada : categoriasSaida;
+    final custom =
+        tipo == 'entrada' ? _categoriasEntradaCustom : _categoriasSaidaCustom;
+    return [...base, ...custom];
+  }
+
   List<String> get categoriasAtuais =>
-      _tipo == 'entrada' ? categoriasEntrada : categoriasSaida;
+      categoriasForTipo(_tipo);
 
   // ── Navegação de período ──────────────────────────────────────────────────
 
@@ -223,6 +236,30 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   void setCategoria(String value) { _categoria = value; notifyListeners(); }
   void setFixa(bool value)        { _fixa = value;      notifyListeners(); }
   void setSuperfluo(bool value)   { _superfluo = value; notifyListeners(); }
+
+  void addCategoriaPersonalizada(String value) {
+    final categoria = value.trim();
+    if (categoria.isEmpty) return;
+
+    final destino = _tipo == 'entrada'
+        ? _categoriasEntradaCustom
+        : _categoriasSaidaCustom;
+
+    final jaExiste = categoriasAtuais.any(
+      (c) => c.toLowerCase() == categoria.toLowerCase(),
+    );
+    if (jaExiste) {
+      _categoria = categoriasAtuais.firstWhere(
+        (c) => c.toLowerCase() == categoria.toLowerCase(),
+      );
+      notifyListeners();
+      return;
+    }
+
+    destino.add(categoria);
+    _categoria = categoria;
+    notifyListeners();
+  }
 
   void resetForm() {
     _categoria = '';
