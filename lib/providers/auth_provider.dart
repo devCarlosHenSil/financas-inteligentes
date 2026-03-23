@@ -377,6 +377,9 @@ class AuthProvider extends ChangeNotifier {
       case 'invalid-email':            return 'E-mail invalido.';
       case 'too-many-requests':        return 'Muitas tentativas. Aguarde e tente novamente.';
       case 'network-request-failed':   return 'Sem conexao com a internet.';
+      case 'operation-not-allowed':
+        return 'Login com e-mail e senha está desativado no Firebase. '
+            'Ative o provedor "E-mail/senha" no Console.';
       case 'requires-recent-login':    return 'Por seguranca, faca login novamente antes de continuar.';
       case 'account-exists-with-different-credential':
         return 'Ja existe conta com esse e-mail em outro metodo de login.';
