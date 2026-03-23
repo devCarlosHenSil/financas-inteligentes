@@ -2,11 +2,6 @@ import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-/// Tela de perfil do usuário.
-///
-/// Permite editar nome de exibição, alterar senha e excluir conta.
-/// Foto de perfil exibe o avatar com inicial — upload de imagem será
-/// adicionado em versão futura (requer firebase_storage + image_picker).
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -17,9 +12,9 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
-    final auth        = context.watch<AuthProvider>();
+    final auth = context.watch<AuthProvider>();
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme   = Theme.of(context).textTheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -29,14 +24,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         children: [
-          // ── Avatar ───────────────────────────────────────────────────────
           _AvatarSection(
             initial: auth.displayInitial,
-            photoURL: auth.photoURL,
+            photoURL: auth.photoUrl, // FIX
           ),
           const SizedBox(height: 24),
 
-          // ── Informações da conta ─────────────────────────────────────────
           _SectionCard(
             header: 'Informações da conta',
             children: [
@@ -50,7 +43,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: const Icon(Icons.badge_outlined),
                 title: const Text('Nome de exibição'),
                 subtitle: Text(
-                  auth.displayLabel == 'Convidado' ? '—' : auth.displayLabel,
+                  auth.displayLabel == 'Convidado'
+                      ? '—'
+                      : auth.displayLabel,
                 ),
                 trailing: const Icon(Icons.edit_outlined, size: 18),
                 onTap: () => _showEditNameDialog(context, auth),
@@ -59,7 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Segurança ─────────────────────────────────────────────────────
           _SectionCard(
             header: 'Segurança',
             children: [
@@ -73,7 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Zona de perigo ────────────────────────────────────────────────
           _SectionCard(
             header: 'Zona de perigo',
             children: [
@@ -95,7 +88,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
 
-          // ── Versão ────────────────────────────────────────────────────────
           const SizedBox(height: 32),
           Center(
             child: Text(
@@ -109,8 +101,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
-  // ── Diálogos ──────────────────────────────────────────────────────────────
 
   Future<void> _showEditNameDialog(
       BuildContext context, AuthProvider auth) async {
@@ -126,10 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: ctrl,
           decoration: const InputDecoration(
             labelText: 'Nome de exibição',
-            hintText: 'Como quer ser chamado?',
           ),
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
         ),
         actions: [
           TextButton(
@@ -141,7 +128,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final name = ctrl.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(ctx);
+
               final ok = await auth.updateDisplayName(name);
+
               if (!ok && context.mounted && auth.errorMessage != null) {
                 _showSnack(context, auth.errorMessage!);
                 auth.clearError();
@@ -152,85 +141,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+
     ctrl.dispose();
   }
 
   Future<void> _showChangePasswordDialog(
       BuildContext context, AuthProvider auth) async {
-    final newCtrl    = TextEditingController();
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
-    bool obscureNew     = true;
-    bool obscureConfirm = true;
 
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('Alterar senha'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: newCtrl,
-                obscureText: obscureNew,
-                decoration: InputDecoration(
-                  labelText: 'Nova senha',
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureNew
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined),
-                    onPressed: () => setState(() => obscureNew = !obscureNew),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: obscureConfirm,
-                decoration: InputDecoration(
-                  labelText: 'Confirmar nova senha',
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined),
-                    onPressed: () =>
-                        setState(() => obscureConfirm = !obscureConfirm),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Alterar senha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentCtrl,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(labelText: 'Senha atual'),
             ),
-            FilledButton(
-              onPressed: () async {
-                if (newCtrl.text.length < 6) {
-                  _showSnack(ctx,
-                      'A senha deve ter pelo menos 6 caracteres.');
-                  return;
-                }
-                if (newCtrl.text != confirmCtrl.text) {
-                  _showSnack(ctx, 'As senhas não coincidem.');
-                  return;
-                }
-                Navigator.pop(ctx);
-                final ok = await auth.updatePassword(newCtrl.text);
-                if (!ok && context.mounted && auth.errorMessage != null) {
-                  _showSnack(context, auth.errorMessage!);
-                  auth.clearError();
-                } else if (ok && context.mounted) {
-                  _showSnack(context, 'Senha alterada com sucesso!');
-                }
-              },
-              child: const Text('Salvar'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newCtrl,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(labelText: 'Nova senha'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                  labelText: 'Confirmar nova senha'),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (currentCtrl.text.isEmpty) {
+                _showSnack(ctx, 'Informe a senha atual.');
+                return;
+              }
+
+              if (newCtrl.text.length < 6) {
+                _showSnack(ctx,
+                    'A senha deve ter pelo menos 6 caracteres.');
+                return;
+              }
+
+              if (newCtrl.text != confirmCtrl.text) {
+                _showSnack(ctx, 'As senhas não coincidem.');
+                return;
+              }
+
+              Navigator.pop(ctx);
+
+              final ok = await auth.updatePassword(
+                currentPassword: currentCtrl.text,
+                newPassword: newCtrl.text,
+              );
+
+              if (!ok && context.mounted && auth.errorMessage != null) {
+                _showSnack(context, auth.errorMessage!);
+                auth.clearError();
+              } else if (ok && context.mounted) {
+                _showSnack(context, 'Senha alterada com sucesso!');
+              }
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
       ),
     );
+
+    currentCtrl.dispose();
     newCtrl.dispose();
     confirmCtrl.dispose();
   }
@@ -254,6 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+
     if (ok == true) await auth.signOut();
   }
 
@@ -264,8 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => AlertDialog.adaptive(
         title: const Text('Excluir conta'),
         content: const Text(
-          'Todos os seus dados serão removidos permanentemente. '
-          'Esta ação não pode ser desfeita.',
+          'Todos os seus dados serão removidos permanentemente.',
         ),
         actions: [
           TextButton(
@@ -273,132 +266,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            style: TextButton.styleFrom(
-                foregroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Excluir'),
           ),
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
 
-    final deleted = await auth.deleteAccount();
-    if (!deleted && context.mounted && auth.errorMessage != null) {
-      _showSnack(context, auth.errorMessage!);
-      auth.clearError();
-    }
+    if (ok == true) await auth.deleteAccount();
   }
 
   void _showSnack(BuildContext context, String msg) {
-    if (!context.mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 }
 
-// ── _AvatarSection ────────────────────────────────────────────────────────────
-
 class _AvatarSection extends StatelessWidget {
   const _AvatarSection({required this.initial, this.photoURL});
 
-  final String  initial;
+  final String initial;
   final String? photoURL;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme   = Theme.of(context).textTheme;
-
-    return Center(
-      child: Column(
-        children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 48,
-                backgroundColor: colorScheme.primaryContainer,
-                backgroundImage:
-                    photoURL != null ? NetworkImage(photoURL!) : null,
-                child: photoURL == null
-                    ? Text(
-                        initial,
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      )
-                    : null,
-              ),
-              // Botão placeholder para futura funcionalidade de upload
-              Tooltip(
-                message: 'Upload de foto disponível em breve',
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: colorScheme.outlineVariant, width: 2),
-                  ),
-                  child: Icon(
-                    Icons.camera_alt_outlined,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Foto de perfil',
-            style: textTheme.bodySmall
-                ?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
+    return CircleAvatar(
+      radius: 48,
+      backgroundImage:
+          photoURL != null ? NetworkImage(photoURL!) : null,
+      child: photoURL == null ? Text(initial) : null,
     );
   }
 }
 
-// ── _SectionCard ──────────────────────────────────────────────────────────────
-
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.header, required this.children});
 
-  final String       header;
+  final String header;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme   = Theme.of(context).textTheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-            child: Text(
-              header,
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          ...children,
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:financas_inteligentes/models/transaction_model.dart';
-import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
 import 'package:financas_inteligentes/services/report_service.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +6,13 @@ import 'package:flutter_masked_text2/flutter_masked_text2.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-/// Tela de transações com botão de exportação para PDF.
+/// Tela de transações com filtro por período (P3-A).
+///
+/// Novidades:
+///   - [_buildPeriodoSelector] → navegação ← mês/ano → com seta e picker
+///   - Lista exibe apenas [tx.transactionsFiltradas] (período selecionado)
+///   - Totais (entradas/saídas/saldo) refletem o período selecionado
+///   - Botão "Hoje" volta para o mês corrente quando em mês diferente
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
 
@@ -16,10 +21,9 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class TransactionsScreenState extends State<TransactionsScreen> {
-  final NumberFormat _currency   = NumberFormat.currency(symbol: 'R\$');
-  final DateFormat   _dateFormat = DateFormat('dd/MM/yyyy');
-
-  bool _exportando = false;
+  final NumberFormat _currency = NumberFormat.currency(symbol: 'R\$');
+  final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
+  final DateFormat _mesFormat  = DateFormat('MMMM yyyy', 'pt_BR');
 
   final MoneyMaskedTextController _valorController = MoneyMaskedTextController(
     decimalSeparator: ',',
@@ -58,27 +62,6 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     );
 
     if (ok) _valorController.updateValue(0.0);
-  }
-
-  Future<void> _exportarPdf() async {
-    if (_exportando) return;
-    setState(() => _exportando = true);
-    try {
-      final tx        = context.read<TransactionProvider>();
-      final userLabel = context.read<AuthProvider>().displayLabel;
-      await ReportService.instance.exportarTransacoes(
-        transactions: tx.transactions,
-        userLabel: userLabel,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao gerar PDF: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _exportando = false);
-    }
   }
 
   void _showEditDialog(TransactionModel trans) {
@@ -148,7 +131,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                     SwitchListTile(
                       title: const Text('Supérfluo'),
                       value: editSuperfluo,
-                      onChanged: (v) => setDialogState(() => editSuperfluo = v),
+                      onChanged: (v) =>
+                          setDialogState(() => editSuperfluo = v),
                     ),
                   ],
                 ),
@@ -162,7 +146,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                   onPressed: () async {
                     if (editCategoria.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Selecione uma categoria.')),
+                        const SnackBar(
+                            content: Text('Selecione uma categoria.')),
                       );
                       return;
                     }
@@ -191,9 +176,157 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     ).then((_) => editValor.dispose());
   }
 
+  // ── Seletor de período ────────────────────────────────────────────────────
+
+  /// Abre um diálogo com lista dos meses disponíveis para selecionar.
+  Future<void> _showMesPicker(TransactionProvider tx) async {
+    final meses = tx.mesesDisponiveis;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecionar período'),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        content: SizedBox(
+          width: 280,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: meses.length,
+            itemBuilder: (context, index) {
+              final mes = meses[index];
+              final isSelected =
+                  mes.month == tx.periodoSelecionado.month &&
+                  mes.year  == tx.periodoSelecionado.year;
+              final label = DateFormat('MMMM yyyy', 'pt_BR').format(mes);
+              final count = tx.transactions
+                  .where((t) =>
+                      t.data.month == mes.month && t.data.year == mes.year)
+                  .length;
+
+              return ListTile(
+                selected: isSelected,
+                selectedColor: Theme.of(context).colorScheme.primary,
+                selectedTileColor: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.08),
+                leading: isSelected
+                    ? Icon(Icons.radio_button_checked,
+                        color: Theme.of(context).colorScheme.primary)
+                    : const Icon(Icons.radio_button_unchecked),
+                title: Text(
+                  label[0].toUpperCase() + label.substring(1),
+                  style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+                trailing: count > 0
+                    ? Text(
+                        '$count',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      )
+                    : null,
+                onTap: () {
+                  context.read<TransactionProvider>().setPeriodo(mes);
+                  Navigator.pop(context);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodoSelector(TransactionProvider tx) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme   = Theme.of(context).textTheme;
+    final label       = _mesFormat.format(tx.periodoSelecionado);
+    final labelFmt    = label[0].toUpperCase() + label.substring(1);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ← mês anterior
+        IconButton(
+          tooltip: 'Mês anterior',
+          icon: const Icon(Icons.chevron_left),
+          color: colorScheme.onPrimary,
+          onPressed: tx.irParaMesAnterior,
+        ),
+
+        // Label clicável — abre picker
+        GestureDetector(
+          onTap: () => _showMesPicker(tx),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.calendar_month_outlined,
+                    size: 16, color: colorScheme.onPrimary),
+                const SizedBox(width: 6),
+                Text(
+                  labelFmt,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down,
+                    size: 18, color: colorScheme.onPrimary),
+              ],
+            ),
+          ),
+        ),
+
+        // → mês seguinte (oculto quando já está no mês atual)
+        IconButton(
+          tooltip: 'Próximo mês',
+          icon: const Icon(Icons.chevron_right),
+          color: tx.temProximoMes
+              ? colorScheme.onPrimary
+              : colorScheme.onPrimary.withValues(alpha: 0.3),
+          onPressed: tx.temProximoMes ? tx.irParaProximoMes : null,
+        ),
+
+        // Botão "Hoje" — só aparece quando não está no mês atual
+        if (!tx.isPeriodoAtual)
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onPrimary,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+            onPressed: tx.irParaMesAtual,
+            child: const Text('Hoje'),
+          ),
+      ],
+    );
+  }
+
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() {
+  Widget _buildHeader(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme   = Theme.of(context).textTheme;
 
@@ -204,60 +337,52 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: colorScheme.surface,
-            child: Icon(Icons.receipt_long, color: colorScheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Transações',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  'Gerencie entradas e saídas com visão premium.',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // ── Botão exportar PDF ─────────────────────────────────────────
-          Tooltip(
-            message: 'Exportar extrato em PDF',
-            child: _exportando
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: colorScheme.surface,
+                child: Icon(Icons.receipt_long, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Transações',
+                      style: textTheme.titleLarge?.copyWith(
+                        color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  )
-                : IconButton(
-                    onPressed: _exportarPdf,
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    color: colorScheme.onPrimary,
-                  ),
+                    Text(
+                      'Gerencie entradas e saídas com visão premium.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Botão exportar PDF
+              _ExportarPdfButton(tx: tx),
+            ],
           ),
+          const SizedBox(height: 12),
+          // Seletor de período centralizado abaixo do título
+          Center(child: _buildPeriodoSelector(tx)),
         ],
       ),
     );
   }
 
-  Widget _buildSummary() {
+  Widget _buildSummary(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme   = Theme.of(context).textTheme;
-    final tx          = context.watch<TransactionProvider>();
+    final count       = tx.transactionsFiltradas.length;
 
     Widget card(String label, double value, Color color) {
       return Expanded(
@@ -287,20 +412,35 @@ class TransactionsScreenState extends State<TransactionsScreen> {
       );
     }
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        card('Entradas', tx.totalEntradas, colorScheme.tertiary),
-        const SizedBox(width: 10),
-        card('Saídas',   tx.totalSaidas,   colorScheme.error),
-        const SizedBox(width: 10),
-        card('Saldo',    tx.saldo,          colorScheme.primary),
+        Row(
+          children: [
+            card('Entradas', tx.totalEntradas, colorScheme.tertiary),
+            const SizedBox(width: 10),
+            card('Saídas', tx.totalSaidas, colorScheme.error),
+            const SizedBox(width: 10),
+            card('Saldo', tx.saldo, colorScheme.primary),
+          ],
+        ),
+        if (count > 0) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '$count transaç${count == 1 ? 'ão' : 'ões'} no período',
+              style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.7)),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildForm() {
+  Widget _buildForm(TransactionProvider tx) {
     final colorScheme = Theme.of(context).colorScheme;
-    final tx          = context.watch<TransactionProvider>();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -348,7 +488,8 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             dense: true,
             title: const Text('Despesa fixa'),
             value: tx.fixa,
-            onChanged: (v) => context.read<TransactionProvider>().setFixa(v),
+            onChanged: (v) =>
+                context.read<TransactionProvider>().setFixa(v),
           ),
           SwitchListTile(
             dense: true,
@@ -415,8 +556,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              onPressed: () =>
-                  context.read<TransactionProvider>().deleteTransaction(t.id),
+              onPressed: () => context
+                  .read<TransactionProvider>()
+                  .deleteTransaction(t.id),
             ),
           ],
         ),
@@ -430,7 +572,9 @@ class TransactionsScreenState extends State<TransactionsScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final tx          = context.watch<TransactionProvider>();
-    final data        = tx.transactions;
+
+    // Lista filtrada pelo período selecionado
+    final data = tx.transactionsFiltradas;
 
     return Scaffold(
       body: Container(
@@ -450,21 +594,37 @@ class TransactionsScreenState extends State<TransactionsScreen> {
 
                 final Widget listWidget = data.isEmpty
                     ? Center(
-                        child: Text(
-                          'Sem transações ainda.',
-                          style: TextStyle(color: colorScheme.onPrimary),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 48,
+                              color: colorScheme.onPrimary
+                                  .withValues(alpha: 0.4),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Sem transações em ${DateFormat('MMMM yyyy', 'pt_BR').format(tx.periodoSelecionado)}.',
+                              style: TextStyle(
+                                  color: colorScheme.onPrimary
+                                      .withValues(alpha: 0.7)),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
                       )
                     : ListView.builder(
                         itemCount: data.length,
-                        itemBuilder: (_, index) => _buildTile(data[index]),
+                        itemBuilder: (context, index) =>
+                            _buildTile(data[index]),
                       );
 
                 return Column(
                   children: [
-                    _buildHeader(),
+                    _buildHeader(tx),
                     const SizedBox(height: 10),
-                    _buildSummary(),
+                    _buildSummary(tx),
                     const SizedBox(height: 10),
                     Expanded(
                       child: isWide
@@ -473,7 +633,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                               children: [
                                 Expanded(
                                   child: SingleChildScrollView(
-                                      child: _buildForm()),
+                                      child: _buildForm(tx)),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: listWidget),
@@ -481,7 +641,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             )
                           : Column(
                               children: [
-                                _buildForm(),
+                                _buildForm(tx),
                                 const SizedBox(height: 10),
                                 Expanded(child: listWidget),
                               ],
@@ -493,6 +653,65 @@ class TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Widget de exportação PDF ───────────────────────────────────────────────────
+
+class _ExportarPdfButton extends StatefulWidget {
+  const _ExportarPdfButton({required this.tx});
+  final TransactionProvider tx;
+
+  @override
+  State<_ExportarPdfButton> createState() => _ExportarPdfButtonState();
+}
+
+class _ExportarPdfButtonState extends State<_ExportarPdfButton> {
+  bool _gerando = false;
+
+  Future<void> _exportar() async {
+    if (_gerando) return;
+    setState(() => _gerando = true);
+    try {
+      await ReportService.exportarTransacoes(
+        periodo:              widget.tx.periodoSelecionado,
+        transacoes:           widget.tx.transactionsFiltradas,
+        totalEntradas:        widget.tx.totalEntradas,
+        totalSaidas:          widget.tx.totalSaidas,
+        saldo:                widget.tx.saldo,
+        entradasPorCategoria: widget.tx.entradasPorCategoria,
+        saidasPorCategoria:   widget.tx.saidasPorCategoria,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao gerar PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _gerando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Exportar PDF do período',
+      child: IconButton(
+        onPressed: _gerando ? null : _exportar,
+        icon: _gerando
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+            : Icon(Icons.picture_as_pdf_outlined, color: colorScheme.onPrimary),
       ),
     );
   }
