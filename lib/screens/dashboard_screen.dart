@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
@@ -74,10 +76,19 @@ class DashboardScreenState extends State<DashboardScreen> {
   // ── Preparação de dados ───────────────────────────────────────────────────
 
   List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
-    return data.entries
+    final sorted = data.entries
         .map((e) => _CategoryTotal(nome: e.key, valor: e.value))
         .toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
+
+    if (sorted.length <= 6) return sorted;
+
+    final top = sorted.take(5).toList();
+    final othersTotal = sorted
+        .skip(5)
+        .fold<double>(0, (sum, item) => sum + item.valor);
+    top.add(_CategoryTotal(nome: 'Outros', valor: othersTotal));
+    return top;
   }
 
   List<PieChartSectionData> _getPieSections(
@@ -108,15 +119,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
-        title: isTouched
-            ? '${item.nome}\n${percent.toStringAsFixed(1)}%'
-            : '${percent.toStringAsFixed(1)}%',
+        title: '',
         radius: radius,
-        titleStyle: TextStyle(
-          fontSize: isTouched ? 10 : 9,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+        borderSide: isTouched
+            ? BorderSide(color: Colors.white.withValues(alpha: 0.55), width: 1.2)
+            : BorderSide.none,
       );
     });
   }
@@ -134,8 +141,11 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildCategoryList(List<_CategoryTotal> items,
-      {required bool isIncome}) {
+  Widget _buildCategoryList(
+    List<_CategoryTotal> items, {
+    required bool isIncome,
+    required int touchedIndex,
+  }) {
     final textTheme   = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
@@ -144,27 +154,51 @@ class DashboardScreenState extends State<DashboardScreen> {
         style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       );
     }
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+
+    return Column(
       children: List.generate(items.length, (index) {
-        final item  = items[index];
+        final item = items[index];
         final color = _categoryColor(item.nome, isIncome: isIncome, index: index);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              item.nome,
-              style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface, fontSize: 12),
-            ),
-          ],
+        final percent = total == 0 ? 0.0 : (item.valor / total) * 100;
+        final isSelected = touchedIndex == index;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.nome,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${percent.toStringAsFixed(1)}%',
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
         );
       }),
     );
@@ -177,8 +211,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   }) {
     return PieChart(
       PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 46,
+        sectionsSpace: 1.5,
+        centerSpaceRadius: 54,
         borderData: FlBorderData(show: false),
         sections: _getPieSections(items,
             isIncome: isIncome, touchedIndex: touchedIndex),
@@ -234,14 +268,21 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             Text(
               selection == null
-                  ? 'Passe o mouse em uma fatia para ver a categoria.'
+                  ? 'Toque em uma fatia ou use a legenda abaixo.'
                   : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurface, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            _buildCategoryList(items, isIncome: isIncome),
+            SizedBox(
+              width: double.infinity,
+              child: _buildCategoryList(
+                items,
+                isIncome: isIncome,
+                touchedIndex: touchedIndex,
+              ),
+            ),
           ],
         ),
       ),
