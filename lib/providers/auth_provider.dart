@@ -14,7 +14,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 ///   - [deleteAccount]      → exclui a conta permanentemente
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth  _auth         = FirebaseAuth.instance;
-  final GoogleSignIn  _googleSignIn = GoogleSignIn();
+  GoogleSignIn? _googleSignIn;
 
   User?   _user;
   bool    _isLoading       = false;
@@ -83,7 +83,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     final normalizedEmail = email.trim().toLowerCase();
-    final normalizedPassword = password.trim();
+    final normalizedPassword = password;
     try {
       await _auth.signInWithEmailAndPassword(
         email: normalizedEmail,
@@ -92,7 +92,24 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } on FirebaseAuthException catch (e) {
-      _errorMessage = _mapAuthError(e.code);
+      if (e.code == 'user-not-found' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-login-credentials') {
+        try {
+          final methods = await _auth.fetchSignInMethodsForEmail(normalizedEmail);
+          if (methods.isNotEmpty && !methods.contains('password')) {
+            _errorMessage =
+                'Este e-mail já existe com outro método (${methods.join(', ')}). '
+                'Use login social ou redefina o acesso.';
+          } else {
+            _errorMessage = _mapAuthError(e.code);
+          }
+        } catch (_) {
+          _errorMessage = _mapAuthError(e.code);
+        }
+      } else {
+        _errorMessage = _mapAuthError(e.code);
+      }
       _setLoading(false);
       return false;
     } catch (_) {
@@ -106,7 +123,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     final normalizedEmail = email.trim().toLowerCase();
-    final normalizedPassword = password.trim();
+    final normalizedPassword = password;
     try {
       await _auth.createUserWithEmailAndPassword(
         email: normalizedEmail,
@@ -135,11 +152,12 @@ class AuthProvider extends ChangeNotifier {
         final provider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('profile');
-        final result = await _auth.signInWithPopup(provider);
+        await _auth.signInWithRedirect(provider);
         _setLoading(false);
-        return result.user != null;
+        return true;
       }
-      final googleUser = await _googleSignIn.signIn();
+      _googleSignIn ??= GoogleSignIn();
+      final googleUser = await _googleSignIn!.signIn();
       if (googleUser == null) { _setLoading(false); return false; }
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -359,8 +377,8 @@ class AuthProvider extends ChangeNotifier {
   // ── Sign Out ──────────────────────────────────────────────────────────────
 
   Future<void> signOut() async {
-    if (!kIsWeb) {
-      try { await _googleSignIn.signOut(); } catch (_) {}
+    if (!kIsWeb && _googleSignIn != null) {
+      try { await _googleSignIn!.signOut(); } catch (_) {}
     }
     await _auth.signOut();
   }
