@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
@@ -32,6 +34,11 @@ class _CategorySelection {
 
 class DashboardScreenState extends State<DashboardScreen> {
   final NumberFormat _currencyFormatter = NumberFormat.currency(symbol: 'R\$');
+  final NumberFormat _compactCurrency = NumberFormat.compactCurrency(
+    symbol: 'R\$',
+    decimalDigits: 1,
+    locale: 'pt_BR',
+  );
 
   int _touchedIncomeIndex  = -1;
   int _touchedExpenseIndex = -1;
@@ -69,10 +76,19 @@ class DashboardScreenState extends State<DashboardScreen> {
   // ── Preparação de dados ───────────────────────────────────────────────────
 
   List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
-    return data.entries
+    final sorted = data.entries
         .map((e) => _CategoryTotal(nome: e.key, valor: e.value))
         .toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
+
+    if (sorted.length <= 6) return sorted;
+
+    final top = sorted.take(5).toList();
+    final othersTotal = sorted
+        .skip(5)
+        .fold<double>(0, (sum, item) => sum + item.valor);
+    top.add(_CategoryTotal(nome: 'Outros', valor: othersTotal));
+    return top;
   }
 
   List<PieChartSectionData> _getPieSections(
@@ -103,15 +119,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
-        title: isTouched
-            ? '${item.nome}\n${percent.toStringAsFixed(1)}%'
-            : '${percent.toStringAsFixed(1)}%',
+        title: '',
         radius: radius,
-        titleStyle: TextStyle(
-          fontSize: isTouched ? 10 : 9,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+        borderSide: isTouched
+            ? BorderSide(color: Colors.white.withValues(alpha: 0.55), width: 1.2)
+            : BorderSide.none,
       );
     });
   }
@@ -129,8 +141,11 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildCategoryList(List<_CategoryTotal> items,
-      {required bool isIncome}) {
+  Widget _buildCategoryList(
+    List<_CategoryTotal> items, {
+    required bool isIncome,
+    required int touchedIndex,
+  }) {
     final textTheme   = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
@@ -139,27 +154,51 @@ class DashboardScreenState extends State<DashboardScreen> {
         style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       );
     }
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+
+    return Column(
       children: List.generate(items.length, (index) {
-        final item  = items[index];
+        final item = items[index];
         final color = _categoryColor(item.nome, isIncome: isIncome, index: index);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              item.nome,
-              style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface, fontSize: 12),
-            ),
-          ],
+        final percent = total == 0 ? 0.0 : (item.valor / total) * 100;
+        final isSelected = touchedIndex == index;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.nome,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${percent.toStringAsFixed(1)}%',
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
         );
       }),
     );
@@ -172,8 +211,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   }) {
     return PieChart(
       PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 46,
+        sectionsSpace: 1.5,
+        centerSpaceRadius: 54,
         borderData: FlBorderData(show: false),
         sections: _getPieSections(items,
             isIncome: isIncome, touchedIndex: touchedIndex),
@@ -229,14 +268,21 @@ class DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             Text(
               selection == null
-                  ? 'Passe o mouse em uma fatia para ver a categoria.'
+                  ? 'Toque em uma fatia ou use a legenda abaixo.'
                   : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurface, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            _buildCategoryList(items, isIncome: isIncome),
+            SizedBox(
+              width: double.infinity,
+              child: _buildCategoryList(
+                items,
+                isIncome: isIncome,
+                touchedIndex: touchedIndex,
+              ),
+            ),
           ],
         ),
       ),
@@ -253,17 +299,17 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: colorScheme.surface,
+            backgroundColor: colorScheme.primaryContainer,
             child: Text(
               initial,
               style: textTheme.titleMedium?.copyWith(
@@ -276,15 +322,15 @@ class DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dashboard Financeiro',
+                  'Painel Financeiro',
                   style: textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+                      color: colorScheme.onSurface, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Olá, $userLabel • ${now[0].toUpperCase()}${now.substring(1)}',
                   style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.75)),
+                      color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -299,14 +345,83 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             icon: Icon(
               Icons.notifications_outlined,
-              color: colorScheme.onPrimary,
+              color: colorScheme.onSurface,
             ),
             tooltip: 'Notificações',
           ),
           Text(
             _currencyFormatter.format(saldo),
             style: textTheme.titleLarge?.copyWith(
-                color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+                color: colorScheme.primary, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureLedgerStrip(TransactionProvider tx) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final entradas = tx.totalEntradas;
+    final saidas = tx.totalSaidas;
+    final total = (entradas + saidas).abs();
+    final entradaRatio = total <= 0 ? 0.5 : (entradas / total).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Fita do mês',
+            style: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: (entradaRatio * 1000).round().clamp(1, 999),
+                    child: Container(color: colorScheme.primary),
+                  ),
+                  Expanded(
+                    flex: ((1 - entradaRatio) * 1000).round().clamp(1, 999),
+                    child:
+                        Container(color: colorScheme.error.withValues(alpha: 0.74)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Entradas ${_compactCurrency.format(entradas)}',
+                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Saídas ${_compactCurrency.format(saidas)}',
+                  textAlign: TextAlign.end,
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -448,9 +563,10 @@ class DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
 
         // ── Cards de insight ─────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isStacked = constraints.maxWidth < 760;
+            final insightCard = Expanded(
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -461,9 +577,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
+            );
+            final suggestionCard = Expanded(
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -474,8 +589,26 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+
+            if (isStacked) {
+              return Column(
+                children: [
+                  Row(children: [insightCard]),
+                  const SizedBox(height: 10),
+                  Row(children: [suggestionCard]),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                insightCard,
+                const SizedBox(width: 10),
+                suggestionCard,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 10),
 
@@ -546,49 +679,73 @@ class DashboardScreenState extends State<DashboardScreen> {
     final tx          = context.watch<TransactionProvider>();
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [colorScheme.primary, colorScheme.primaryContainer],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (tx.isLoading) const LinearProgressIndicator(minHeight: 2),
-                const SizedBox(height: 8),
-                _buildPremiumHeader(tx.saldo),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildChartCard(
-                          title: 'Entradas por Categoria',
-                          data: tx.entradasPorCategoria,
-                          isIncome: true,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildChartCard(
-                          title: 'Saídas por Categoria',
-                          data: tx.saidasPorCategoria,
-                          isIncome: false,
-                        ),
-                      ),
-                    ],
-                  ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (tx.isLoading)
+                LinearProgressIndicator(
+                  minHeight: 2,
+                  color: colorScheme.primary,
+                  backgroundColor: colorScheme.surfaceContainerHigh,
                 ),
-                const SizedBox(height: 10),
-                _buildInsightsAndActions(tx.saldo),
-              ],
-            ),
+              const SizedBox(height: 8),
+              _buildPremiumHeader(tx.saldo),
+              const SizedBox(height: 10),
+              _buildSignatureLedgerStrip(tx),
+              const SizedBox(height: 10),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isStacked = constraints.maxWidth < 900;
+                    if (isStacked) {
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: _buildChartCard(
+                              title: 'Entradas por Categoria',
+                              data: tx.entradasPorCategoria,
+                              isIncome: true,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: _buildChartCard(
+                              title: 'Saídas por Categoria',
+                              data: tx.saidasPorCategoria,
+                              isIncome: false,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Entradas por Categoria',
+                            data: tx.entradasPorCategoria,
+                            isIncome: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildChartCard(
+                            title: 'Saídas por Categoria',
+                            data: tx.saidasPorCategoria,
+                            isIncome: false,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildInsightsAndActions(tx.saldo),
+            ],
           ),
         ),
       ),
