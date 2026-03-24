@@ -250,7 +250,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-        ),
+        );
       },
     );
   }
