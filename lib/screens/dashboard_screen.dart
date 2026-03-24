@@ -858,7 +858,7 @@ class DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final tx          = context.watch<TransactionProvider>();
+    final tx = context.watch<TransactionProvider>();
 
     return Scaffold(
       body: SafeArea(
@@ -876,130 +876,51 @@ class DashboardScreenState extends State<DashboardScreen> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: colorScheme.outlineVariant),
                   ),
-                  child: Column(
-                    children: [
-                      _buildPremiumHeader(tx.saldo),
-                      const SizedBox(height: 10),
-                      _buildSignatureLedgerStrip(tx),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 7,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: _buildChartCard(
-                                      title: 'Entradas por Categoria',
-                                      data: tx.entradasPorCategoria,
-                                      isIncome: true,
-                                    ),
+                  child: Column(children: [
+                    _buildPremiumHeader(tx.saldo),
+                    const SizedBox(height: 10),
+                    _buildSignatureLedgerStrip(tx),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: _buildChartCard(
+                                    title: 'Entradas por Categoria',
+                                    data: tx.entradasPorCategoria,
+                                    isIncome: true,
                                   ),
-                                  const SizedBox(height: 10),
-                                  Expanded(child: _buildRecentTransactionsCard(tx)),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(height: 10),
+                                Expanded(child: _buildRecentTransactionsCard(tx)),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: _buildChartCard(
-                                      title: 'Saídas por Categoria',
-                                      data: tx.saidasPorCategoria,
-                                      isIncome: false,
-                                    ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: _buildChartCard(
+                                    title: 'Saídas por Categoria',
+                                    data: tx.saidasPorCategoria,
+                                    isIncome: false,
                                   ),
-                                  const SizedBox(height: 10),
-                                  Expanded(child: _buildInsightsAndActions(tx.saldo)),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(height: 10),
+                                Expanded(child: _buildInsightsAndActions(tx.saldo)),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                )),
-        ],
-      ),
-    );
-  }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final tx          = context.watch<TransactionProvider>();
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              _buildSideRail(),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: colorScheme.outlineVariant),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildPremiumHeader(tx.saldo),
-                      const SizedBox(height: 10),
-                      _buildSignatureLedgerStrip(tx),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 7,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: _buildChartCard(
-                                      title: 'Entradas por Categoria',
-                                      data: tx.entradasPorCategoria,
-                                      isIncome: true,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Expanded(child: _buildRecentTransactionsCard(tx)),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: _buildChartCard(
-                                      title: 'Saídas por Categoria',
-                                      data: tx.saidasPorCategoria,
-                                      isIncome: false,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Expanded(child: _buildInsightsAndActions(tx.saldo)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
+                    ),
+                  ]),
                 ),
               ),
             ],
