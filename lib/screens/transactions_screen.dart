@@ -486,6 +486,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (tx.saldoAnterior > 0) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Text(
+              'Inclui saldo positivo anterior: ${_currency.format(tx.saldoAnterior)}',
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         Row(
           children: [
             card('Entradas', tx.totalEntradas, colorScheme.tertiary),

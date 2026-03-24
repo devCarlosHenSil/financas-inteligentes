@@ -38,6 +38,7 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   double _totalEntradas = 0;
   double _totalSaidas   = 0;
   double _totalSuperfluos = 0;
+  double _saldoAnterior = 0;
   Map<String, double> _entradasPorCategoria = {};
   Map<String, double> _saidasPorCategoria   = {};
 
@@ -66,6 +67,7 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
   double get totalEntradas   => _totalEntradas;
   double get totalSaidas     => _totalSaidas;
   double get totalSuperfluos => _totalSuperfluos;
+  double get saldoAnterior   => _saldoAnterior;
   double get saldo           => _totalEntradas - _totalSaidas;
 
   Map<String, double> get entradasPorCategoria => _entradasPorCategoria;
@@ -202,6 +204,12 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
     final Map<String, double> entradas = {};
     final Map<String, double> saidas   = {};
     double te = 0, ts = 0, tsp = 0;
+    final saldoAnterior = _saldoPositivoMesAnterior(_periodoSelecionado);
+
+    if (saldoAnterior > 0) {
+      te += saldoAnterior;
+      entradas['Saldo anterior'] = saldoAnterior;
+    }
 
     for (final t in transactionsFiltradas) {
       if (t.tipo == 'entrada') {
@@ -219,8 +227,25 @@ class TransactionProvider extends ChangeNotifier with ErrorHandlerMixin {
     _totalEntradas        = te;
     _totalSaidas          = ts;
     _totalSuperfluos      = tsp;
+    _saldoAnterior        = saldoAnterior;
     _entradasPorCategoria = entradas;
     _saidasPorCategoria   = saidas;
+  }
+
+  /// Saldo carregado para o período: soma de todos os meses anteriores,
+  /// considerando apenas valor positivo remanescente.
+  double _saldoPositivoMesAnterior(DateTime periodo) {
+    final inicioPeriodo = DateTime(periodo.year, periodo.month);
+    double acumulado = 0;
+
+    for (final t in _transactions) {
+      final mesTransacao = DateTime(t.data.year, t.data.month);
+      if (mesTransacao.isBefore(inicioPeriodo)) {
+        acumulado += t.tipo == 'entrada' ? t.valor : -t.valor;
+      }
+    }
+
+    return acumulado > 0 ? acumulado : 0;
   }
 
   void reload() => _startListening();
