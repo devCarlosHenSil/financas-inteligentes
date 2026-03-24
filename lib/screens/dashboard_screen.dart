@@ -95,6 +95,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     List<_CategoryTotal> items, {
     required bool isIncome,
     required int touchedIndex,
+    required double baseRadius,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
@@ -103,7 +104,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           value: 1,
           color: colorScheme.onSurfaceVariant,
           title: '',
-          radius: 72,
+          radius: baseRadius,
         ),
       ];
     }
@@ -113,9 +114,8 @@ class DashboardScreenState extends State<DashboardScreen> {
       final percent    = total == 0 ? 0.0 : (item.valor / total) * 100.0;
       final isTouched    = index == touchedIndex;
       final isLargeSlice = percent >= 20;
-      final radius = isTouched
-          ? (isLargeSlice ? 82.0 : 88.0)
-          : (isLargeSlice ? 70.0 : 78.0);
+      final normalRadius = isLargeSlice ? baseRadius * 0.94 : baseRadius;
+      final radius = isTouched ? normalRadius + 6 : normalRadius;
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
@@ -211,32 +211,47 @@ class DashboardScreenState extends State<DashboardScreen> {
     required bool isIncome,
     required int touchedIndex,
   }) {
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 1.5,
-        centerSpaceRadius: 54,
-        borderData: FlBorderData(show: false),
-        sections: _getPieSections(items,
-            isIncome: isIncome, touchedIndex: touchedIndex),
-        pieTouchData: PieTouchData(
-          enabled: items.isNotEmpty,
-          touchCallback: (event, response) {
-            if (items.isEmpty) return;
-            final hasInteraction = event.isInterestedForInteractions;
-            final idx = hasInteraction
-                ? (response?.touchedSection?.touchedSectionIndex ?? -1)
-                : -1;
-            if (!mounted) return;
-            if (isIncome) {
-              if (_touchedIncomeIndex == idx) return;
-              setState(() => _touchedIncomeIndex = idx);
-            } else {
-              if (_touchedExpenseIndex == idx) return;
-              setState(() => _touchedExpenseIndex = idx);
-            }
-          },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shortestSide = constraints.biggest.shortestSide;
+        final baseRadius = (shortestSide * 0.34).clamp(42.0, 68.0);
+        final centerRadius = (shortestSide * 0.16).clamp(24.0, 36.0);
+
+        return Padding(
+          padding: const EdgeInsets.all(8),
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 1.5,
+              centerSpaceRadius: centerRadius,
+              borderData: FlBorderData(show: false),
+              sections: _getPieSections(
+                items,
+                isIncome: isIncome,
+                touchedIndex: touchedIndex,
+                baseRadius: baseRadius,
+              ),
+              pieTouchData: PieTouchData(
+                enabled: items.isNotEmpty,
+                touchCallback: (event, response) {
+                  if (items.isEmpty) return;
+                  final hasInteraction = event.isInterestedForInteractions;
+                  final idx = hasInteraction
+                      ? (response?.touchedSection?.touchedSectionIndex ?? -1)
+                      : -1;
+                  if (!mounted) return;
+                  if (isIncome) {
+                    if (_touchedIncomeIndex == idx) return;
+                    setState(() => _touchedIncomeIndex = idx);
+                  } else {
+                    if (_touchedExpenseIndex == idx) return;
+                    setState(() => _touchedExpenseIndex = idx);
+                  }
+                },
+              ),
+            ),
+          ),
         ),
-      ),
+      },
     );
   }
 
