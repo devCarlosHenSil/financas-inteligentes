@@ -20,6 +20,9 @@ Future<void> main() async {
   String? startupError;
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
   } catch (error) {
     startupError = error.toString();
   }
