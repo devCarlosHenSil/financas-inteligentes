@@ -30,6 +30,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     thousandSeparator: '.',
     leftSymbol: 'R\$ ',
   );
+  DateTime _dataSelecionada = DateTime.now();
 
   @override
   void dispose() {
@@ -56,12 +57,67 @@ class TransactionsScreenState extends State<TransactionsScreen> {
         tipo: tx.tipo,
         categoria: tx.categoria,
         fixa: tx.fixa,
-        data: DateTime.now(),
+        data: _dataSelecionada,
         superfluo: tx.superfluo,
       ),
     );
 
-    if (ok) _valorController.updateValue(0.0);
+    if (ok) {
+      _valorController.updateValue(0.0);
+      setState(() => _dataSelecionada = DateTime.now());
+    }
+  }
+
+  Future<void> _pickDate({
+    required DateTime initialDate,
+    required ValueChanged<DateTime> onSelected,
+  }) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year + 2),
+      locale: const Locale('pt', 'BR'),
+    );
+    if (picked != null) onSelected(picked);
+  }
+
+  Future<void> _showAddCategoryDialog(TransactionProvider tx) async {
+    final controller = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Nova categoria de ${tx.tipo == 'entrada' ? 'entrada' : 'saída'}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Nome da categoria',
+            hintText: 'Ex.: Reembolso',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              context
+                  .read<TransactionProvider>()
+                  .addCategoriaPersonalizada(controller.text);
+              Navigator.pop(context);
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
   }
 
   void _showEditDialog(TransactionModel trans) {
@@ -76,15 +132,15 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     String editCategoria = trans.categoria;
     bool   editFixa      = trans.fixa;
     bool   editSuperfluo = trans.superfluo;
+    DateTime editData    = trans.data;
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final categorias = editTipo == 'entrada'
-                ? TransactionProvider.categoriasEntrada
-                : TransactionProvider.categoriasSaida;
+            final tx = context.read<TransactionProvider>();
+            final categorias = tx.categoriasForTipo(editTipo);
 
             return AlertDialog(
               title: const Text('Editar transação'),
@@ -123,6 +179,21 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                       onChanged: (v) =>
                           setDialogState(() => editCategoria = v ?? ''),
                     ),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.calendar_month_outlined),
+                      title: const Text('Data da transação'),
+                      subtitle: Text(_dateFormat.format(editData)),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit_calendar_outlined),
+                        onPressed: () => _pickDate(
+                          initialDate: editData,
+                          onSelected: (date) =>
+                              setDialogState(() => editData = date),
+                        ),
+                      ),
+                    ),
                     SwitchListTile(
                       title: const Text('Despesa fixa'),
                       value: editFixa,
@@ -159,7 +230,7 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                             tipo:       editTipo,
                             categoria:  editCategoria,
                             fixa:       editFixa,
-                            data:       trans.data,
+                            data:       editData,
                             superfluo:  editSuperfluo,
                           ),
                         );
@@ -415,6 +486,19 @@ class TransactionsScreenState extends State<TransactionsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (tx.saldoAnterior > 0) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Text(
+              'Inclui saldo positivo anterior: ${_currency.format(tx.saldoAnterior)}',
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         Row(
           children: [
             card('Entradas', tx.totalEntradas, colorScheme.tertiary),
@@ -483,6 +567,28 @@ class TransactionsScreenState extends State<TransactionsScreen> {
                 .toList(),
             onChanged: (v) =>
                 context.read<TransactionProvider>().setCategoria(v ?? ''),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _showAddCategoryDialog(tx),
+              icon: const Icon(Icons.add),
+              label: const Text('Nova categoria'),
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today_outlined),
+            title: const Text('Data da transação'),
+            subtitle: Text(_dateFormat.format(_dataSelecionada)),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_calendar_outlined),
+              onPressed: () => _pickDate(
+                initialDate: _dataSelecionada,
+                onSelected: (date) =>
+                    setState(() => _dataSelecionada = date),
+              ),
+            ),
           ),
           SwitchListTile(
             dense: true,

@@ -36,7 +36,10 @@ class LoginScreenState extends State<LoginScreen> {
       return;
     }
     final auth = context.read<AuthProvider>();
-    final ok   = await auth.signIn(email: email, password: password);
+    final ok   = await auth.signInWithEmailPassword(
+      email: email,
+      password: password,
+    );
     if (!mounted) return;
     if (!ok && auth.errorMessage != null) {
       _showSnack(auth.errorMessage!);
