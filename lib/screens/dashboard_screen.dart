@@ -763,8 +763,8 @@ class DashboardScreenState extends State<DashboardScreen> {
     final items = const [
       {'icon': Icons.dashboard_outlined, 'label': 'Dashboard'},
       {'icon': Icons.receipt_long_outlined, 'label': 'Transações'},
-      {'icon': Icons.account_balance_wallet_outlined, 'label': 'Pagamentos'},
-      {'icon': Icons.credit_card_outlined, 'label': 'Cartões'},
+      {'icon': Icons.account_balance_wallet_outlined, 'label': 'Lista de Compras'},
+      {'icon': Icons.credit_card_outlined, 'label': 'Orçamento Mensals'},
       {'icon': Icons.bar_chart_outlined, 'label': 'Relatórios'},
       {'icon': Icons.settings_outlined, 'label': 'Configurações'},
     ];
