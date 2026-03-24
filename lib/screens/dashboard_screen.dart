@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:financas_inteligentes/providers/auth_provider.dart';
 import 'package:financas_inteligentes/providers/goal_provider.dart';
 import 'package:financas_inteligentes/providers/transaction_provider.dart';
