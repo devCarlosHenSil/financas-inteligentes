@@ -32,6 +32,11 @@ class _CategorySelection {
 
 class DashboardScreenState extends State<DashboardScreen> {
   final NumberFormat _currencyFormatter = NumberFormat.currency(symbol: 'R\$');
+  final NumberFormat _compactCurrency = NumberFormat.compactCurrency(
+    symbol: 'R\$',
+    decimalDigits: 1,
+    locale: 'pt_BR',
+  );
 
   int _touchedIncomeIndex  = -1;
   int _touchedExpenseIndex = -1;
@@ -69,16 +74,26 @@ class DashboardScreenState extends State<DashboardScreen> {
   // ── Preparação de dados ───────────────────────────────────────────────────
 
   List<_CategoryTotal> _prepareChartData(Map<String, double> data) {
-    return data.entries
+    final sorted = data.entries
         .map((e) => _CategoryTotal(nome: e.key, valor: e.value))
         .toList()
       ..sort((a, b) => b.valor.compareTo(a.valor));
+
+    if (sorted.length <= 6) return sorted;
+
+    final top = sorted.take(5).toList();
+    final othersTotal = sorted
+        .skip(5)
+        .fold<double>(0, (sum, item) => sum + item.valor);
+    top.add(_CategoryTotal(nome: 'Outros', valor: othersTotal));
+    return top;
   }
 
   List<PieChartSectionData> _getPieSections(
     List<_CategoryTotal> items, {
     required bool isIncome,
     required int touchedIndex,
+    required double baseRadius,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
@@ -87,7 +102,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           value: 1,
           color: colorScheme.onSurfaceVariant,
           title: '',
-          radius: 72,
+          radius: baseRadius,
         ),
       ];
     }
@@ -97,21 +112,16 @@ class DashboardScreenState extends State<DashboardScreen> {
       final percent    = total == 0 ? 0.0 : (item.valor / total) * 100.0;
       final isTouched    = index == touchedIndex;
       final isLargeSlice = percent >= 20;
-      final radius = isTouched
-          ? (isLargeSlice ? 82.0 : 88.0)
-          : (isLargeSlice ? 70.0 : 78.0);
+      final normalRadius = isLargeSlice ? baseRadius * 0.94 : baseRadius;
+      final radius = isTouched ? normalRadius + 6 : normalRadius;
       return PieChartSectionData(
         value: item.valor,
         color: _categoryColor(item.nome, isIncome: isIncome, index: index),
-        title: isTouched
-            ? '${item.nome}\n${percent.toStringAsFixed(1)}%'
-            : '${percent.toStringAsFixed(1)}%',
+        title: '',
         radius: radius,
-        titleStyle: TextStyle(
-          fontSize: isTouched ? 10 : 9,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
+        borderSide: isTouched
+            ? BorderSide(color: Colors.white.withValues(alpha: 0.55), width: 1.2)
+            : BorderSide.none,
       );
     });
   }
@@ -129,8 +139,11 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   // ── Widgets ───────────────────────────────────────────────────────────────
 
-  Widget _buildCategoryList(List<_CategoryTotal> items,
-      {required bool isIncome}) {
+  Widget _buildCategoryList(
+    List<_CategoryTotal> items, {
+    required bool isIncome,
+    required int touchedIndex,
+  }) {
     final textTheme   = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     if (items.isEmpty) {
@@ -139,29 +152,55 @@ class DashboardScreenState extends State<DashboardScreen> {
         style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       );
     }
-    return Wrap(
-      spacing: 12,
-      runSpacing: 8,
-      children: List.generate(items.length, (index) {
-        final item  = items[index];
+    final total = items.fold<double>(0, (sum, item) => sum + item.valor);
+
+    return ListView.separated(
+      itemCount: items.length,
+      padding: EdgeInsets.zero,
+      separatorBuilder: (_, __) => const SizedBox(height: 4),
+      itemBuilder: (context, index) {
+        final item = items[index];
         final color = _categoryColor(item.nome, isIncome: isIncome, index: index);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              item.nome,
-              style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface, fontSize: 12),
-            ),
-          ],
+        final percent = total == 0 ? 0.0 : (item.valor / total) * 100;
+        final isSelected = touchedIndex == index;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.nome,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${percent.toStringAsFixed(1)}%',
+                style: textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
         );
-      }),
+      },
     );
   }
 
@@ -170,32 +209,47 @@ class DashboardScreenState extends State<DashboardScreen> {
     required bool isIncome,
     required int touchedIndex,
   }) {
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 46,
-        borderData: FlBorderData(show: false),
-        sections: _getPieSections(items,
-            isIncome: isIncome, touchedIndex: touchedIndex),
-        pieTouchData: PieTouchData(
-          enabled: items.isNotEmpty,
-          touchCallback: (event, response) {
-            if (items.isEmpty) return;
-            final hasInteraction = event.isInterestedForInteractions;
-            final idx = hasInteraction
-                ? (response?.touchedSection?.touchedSectionIndex ?? -1)
-                : -1;
-            if (!mounted) return;
-            if (isIncome) {
-              if (_touchedIncomeIndex == idx) return;
-              setState(() => _touchedIncomeIndex = idx);
-            } else {
-              if (_touchedExpenseIndex == idx) return;
-              setState(() => _touchedExpenseIndex = idx);
-            }
-          },
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shortestSide = constraints.biggest.shortestSide;
+        final baseRadius = (shortestSide * 0.34).clamp(42.0, 68.0);
+        final centerRadius = (shortestSide * 0.16).clamp(24.0, 36.0);
+
+        return Padding(
+          padding: const EdgeInsets.all(8),
+          child: PieChart(
+            PieChartData(
+              sectionsSpace: 1.5,
+              centerSpaceRadius: centerRadius,
+              borderData: FlBorderData(show: false),
+              sections: _getPieSections(
+                items,
+                isIncome: isIncome,
+                touchedIndex: touchedIndex,
+                baseRadius: baseRadius,
+              ),
+              pieTouchData: PieTouchData(
+                enabled: items.isNotEmpty,
+                touchCallback: (event, response) {
+                  if (items.isEmpty) return;
+                  final hasInteraction = event.isInterestedForInteractions;
+                  final idx = hasInteraction
+                      ? (response?.touchedSection?.touchedSectionIndex ?? -1)
+                      : -1;
+                  if (!mounted) return;
+                  if (isIncome) {
+                    if (_touchedIncomeIndex == idx) return;
+                    setState(() => _touchedIncomeIndex = idx);
+                  } else {
+                    if (_touchedExpenseIndex == idx) return;
+                    setState(() => _touchedExpenseIndex = idx);
+                  }
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -222,21 +276,74 @@ class DashboardScreenState extends State<DashboardScreen> {
                   fontWeight: FontWeight.w700, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 10),
+            SizedBox(
+              height: 14,
+              child: Text(
+                selection == null
+                    ? 'Toque em uma fatia ou use a legenda.'
+                    : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             Expanded(
-              child: _buildPieChart(items,
-                  isIncome: isIncome, touchedIndex: touchedIndex),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final horizontal = constraints.maxWidth >= 640;
+                  if (horizontal) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: _buildPieChart(
+                            items,
+                            isIncome: isIncome,
+                            touchedIndex: touchedIndex,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 4,
+                          child: _buildCategoryList(
+                            items,
+                            isIncome: isIncome,
+                            touchedIndex: touchedIndex,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _buildPieChart(
+                          items,
+                          isIncome: isIncome,
+                          touchedIndex: touchedIndex,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        flex: 4,
+                        child: _buildCategoryList(
+                          items,
+                          isIncome: isIncome,
+                          touchedIndex: touchedIndex,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              selection == null
-                  ? 'Passe o mouse em uma fatia para ver a categoria.'
-                  : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            _buildCategoryList(items, isIncome: isIncome),
           ],
         ),
       ),
@@ -253,17 +360,17 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: colorScheme.surface,
+            backgroundColor: colorScheme.primaryContainer,
             child: Text(
               initial,
               style: textTheme.titleMedium?.copyWith(
@@ -276,15 +383,15 @@ class DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dashboard Financeiro',
+                  'Painel Financeiro',
                   style: textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+                      color: colorScheme.onSurface, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Olá, $userLabel • ${now[0].toUpperCase()}${now.substring(1)}',
                   style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.75)),
+                      color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -299,14 +406,83 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
             icon: Icon(
               Icons.notifications_outlined,
-              color: colorScheme.onPrimary,
+              color: colorScheme.onSurface,
             ),
             tooltip: 'Notificações',
           ),
           Text(
             _currencyFormatter.format(saldo),
             style: textTheme.titleLarge?.copyWith(
-                color: colorScheme.onPrimary, fontWeight: FontWeight.w800),
+                color: colorScheme.primary, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureLedgerStrip(TransactionProvider tx) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final entradas = tx.totalEntradas;
+    final saidas = tx.totalSaidas;
+    final total = (entradas + saidas).abs();
+    final entradaRatio = total <= 0 ? 0.5 : (entradas / total).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Fita do mês',
+            style: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: (entradaRatio * 1000).round().clamp(1, 999),
+                    child: Container(color: colorScheme.primary),
+                  ),
+                  Expanded(
+                    flex: ((1 - entradaRatio) * 1000).round().clamp(1, 999),
+                    child:
+                        Container(color: colorScheme.error.withValues(alpha: 0.74)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Entradas ${_compactCurrency.format(entradas)}',
+                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Saídas ${_compactCurrency.format(saidas)}',
+                  textAlign: TextAlign.end,
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -448,9 +624,10 @@ class DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
 
         // ── Cards de insight ─────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isStacked = constraints.maxWidth < 760;
+            final insightCard = Expanded(
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -461,9 +638,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
+            );
+            final suggestionCard = Expanded(
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -474,8 +650,26 @@ class DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+
+            if (isStacked) {
+              return Column(
+                children: [
+                  Row(children: [insightCard]),
+                  const SizedBox(height: 10),
+                  Row(children: [suggestionCard]),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                insightCard,
+                const SizedBox(width: 10),
+                suggestionCard,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 10),
 
@@ -538,6 +732,125 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildSideRail() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final items = const [
+      (Icons.dashboard_outlined, 'Dashboard', true),
+      (Icons.receipt_long_outlined, 'Transações', false),
+      (Icons.account_balance_wallet_outlined, 'Pagamentos', false),
+      (Icons.credit_card_outlined, 'Cartões', false),
+      (Icons.bar_chart_outlined, 'Relatórios', false),
+      (Icons.settings_outlined, 'Configurações', false),
+    ];
+
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.currency_exchange, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('finanças', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...items.map((item) {
+            final selected = item.$3;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selected ? cs.primary.withValues(alpha: 0.16) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(item.$1, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
+                  title: Text(item.$2, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Aceite cartões e pix', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(onPressed: () {}, child: const Text('Configurar')),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentTransactionsCard(TransactionProvider tx) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final txs = tx.transactionsFiltradas.take(5).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recent Transaction', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('Movimentações mais recentes do período.', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          if (txs.isEmpty)
+            Text('Sem transações no período.', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+          else
+            ...txs.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      CircleAvatar(radius: 16, backgroundColor: cs.surfaceContainerHighest, child: Icon(t.tipo == 'entrada' ? Icons.south_west : Icons.north_east, size: 16)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.categoria, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(DateFormat('dd MMM').format(t.data), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -546,49 +859,71 @@ class DashboardScreenState extends State<DashboardScreen> {
     final tx          = context.watch<TransactionProvider>();
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [colorScheme.primary, colorScheme.primaryContainer],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (tx.isLoading) const LinearProgressIndicator(minHeight: 2),
-                const SizedBox(height: 8),
-                _buildPremiumHeader(tx.saldo),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Row(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              _buildSideRail(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
                     children: [
+                      _buildPremiumHeader(tx.saldo),
+                      const SizedBox(height: 10),
+                      _buildSignatureLedgerStrip(tx),
+                      const SizedBox(height: 10),
                       Expanded(
-                        child: _buildChartCard(
-                          title: 'Entradas por Categoria',
-                          data: tx.entradasPorCategoria,
-                          isIncome: true,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildChartCard(
-                          title: 'Saídas por Categoria',
-                          data: tx.saidasPorCategoria,
-                          isIncome: false,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Entradas por Categoria',
+                                      data: tx.entradasPorCategoria,
+                                      isIncome: true,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildRecentTransactionsCard(tx)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Saídas por Categoria',
+                                      data: tx.saidasPorCategoria,
+                                      isIncome: false,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildInsightsAndActions(tx.saldo)),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                _buildInsightsAndActions(tx.saldo),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
