@@ -141,7 +141,7 @@ class ReportService {
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
-                  'Relatório de Transações — $mesLabel',
+                  'Relatorio de Transacoes - $mesLabel',
                   style: pw.TextStyle(fontSize: 11, color: _textMuted),
                 ),
               ],
@@ -167,7 +167,7 @@ class ReportService {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'Finanças Inteligentes — Relatório confidencial',
+              'Financas Inteligentes - Relatorio confidencial',
               style: pw.TextStyle(fontSize: 8, color: _textMuted),
             ),
             pw.Text(
@@ -390,4 +390,3 @@ class ReportService {
   static String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
-
