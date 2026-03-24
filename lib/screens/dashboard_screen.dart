@@ -736,12 +736,12 @@ class DashboardScreenState extends State<DashboardScreen> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final items = const [
-      (Icons.dashboard_outlined, 'Dashboard', true),
-      (Icons.receipt_long_outlined, 'Transações', false),
-      (Icons.account_balance_wallet_outlined, 'Pagamentos', false),
-      (Icons.credit_card_outlined, 'Cartões', false),
-      (Icons.bar_chart_outlined, 'Relatórios', false),
-      (Icons.settings_outlined, 'Configurações', false),
+      {'icon': Icons.dashboard_outlined, 'label': 'Dashboard', 'selected': true},
+      {'icon': Icons.receipt_long_outlined, 'label': 'Transações', 'selected': false},
+      {'icon': Icons.account_balance_wallet_outlined, 'label': 'Pagamentos', 'selected': false},
+      {'icon': Icons.credit_card_outlined, 'label': 'Cartões', 'selected': false},
+      {'icon': Icons.bar_chart_outlined, 'label': 'Relatórios', 'selected': false},
+      {'icon': Icons.settings_outlined, 'label': 'Configurações', 'selected': false},
     ];
 
     return Container(
@@ -764,7 +764,9 @@ class DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 18),
           ...items.map((item) {
-            final selected = item.$3;
+            final selected = item['selected'] as bool;
+            final icon = item['icon'] as IconData;
+            final label = item['label'] as String;
             return Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Container(
@@ -774,8 +776,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: ListTile(
                   dense: true,
-                  leading: Icon(item.$1, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
-                  title: Text(item.$2, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                  leading: Icon(icon, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
+                  title: Text(label, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
                 ),
               ),
             );
@@ -839,6 +841,83 @@ class DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(t.categoria, maxLines: 1, overflow: TextOverflow.ellipsis),
                             Text(DateFormat('dd MMM').format(t.data), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final tx          = context.watch<TransactionProvider>();
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              _buildSideRail(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPremiumHeader(tx.saldo),
+                      const SizedBox(height: 10),
+                      _buildSignatureLedgerStrip(tx),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Entradas por Categoria',
+                                      data: tx.entradasPorCategoria,
+                                      isIncome: true,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildRecentTransactionsCard(tx)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Saídas por Categoria',
+                                      data: tx.saidasPorCategoria,
+                                      isIncome: false,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildInsightsAndActions(tx.saldo)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
