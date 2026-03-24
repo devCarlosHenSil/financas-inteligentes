@@ -6,6 +6,7 @@ import 'package:financas_inteligentes/screens/investments_screen.dart';
 import 'package:financas_inteligentes/screens/notification_settings_screen.dart';
 import 'package:financas_inteligentes/screens/shopping_list_screen.dart';
 import 'package:financas_inteligentes/screens/transactions_screen.dart';
+import 'package:financas_inteligentes/screens/budget_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -40,6 +41,7 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   int _touchedIncomeIndex  = -1;
   int _touchedExpenseIndex = -1;
+  int _sideNavIndex = 0;
 
   // ── Helpers de cor ────────────────────────────────────────────────────────
 
@@ -616,8 +618,9 @@ class DashboardScreenState extends State<DashboardScreen> {
         ? 'Saldo positivo de ${_currencyFormatter.format(saldo)}. Continue investindo.'
         : 'Saldo negativo de ${_currencyFormatter.format(saldo)}. Ajuste gastos.';
 
-    return Column(
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        children: [
         // ── Mini-widget de metas ─────────────────────────────────────────
         _buildGoalsMiniWidget(),
         if (context.watch<GoalProvider>().activeGoals.isNotEmpty)
@@ -728,7 +731,162 @@ class DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  void _onSideNavTap(int index) {
+    setState(() => _sideNavIndex = index);
+    switch (index) {
+      case 1:
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionsScreen()));
+        break;
+      case 2:
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen()));
+        break;
+      case 3:
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetScreen()));
+        break;
+      case 4:
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const InvestmentsScreen()));
+        break;
+      case 5:
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()));
+        break;
+    }
+  }
+
+  Widget _buildSideRail() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final items = const [
+      {'icon': Icons.dashboard_outlined, 'label': 'Dashboard'},
+      {'icon': Icons.receipt_long_outlined, 'label': 'Transações'},
+      {'icon': Icons.account_balance_wallet_outlined, 'label': 'Pagamentos'},
+      {'icon': Icons.credit_card_outlined, 'label': 'Cartões'},
+      {'icon': Icons.bar_chart_outlined, 'label': 'Relatórios'},
+      {'icon': Icons.settings_outlined, 'label': 'Configurações'},
+    ];
+
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.currency_exchange, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('finanças', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final selected = _sideNavIndex == index;
+            final icon = item['icon'] as IconData;
+            final label = item['label'] as String;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _onSideNavTap(index),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: selected ? cs.primary.withValues(alpha: 0.16) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(icon, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
+                    title: Text(label, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Aceite cartões e pix', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(onPressed: () {}, child: const Text('Configurar')),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentTransactionsCard(TransactionProvider tx) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final txs = tx.transactionsFiltradas.take(5).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recent Transaction', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('Movimentações mais recentes do período.', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          if (txs.isEmpty)
+            Text('Sem transações no período.', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+          else
+            Expanded(
+              child: ListView.separated(
+                itemCount: txs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, index) {
+                  final t = txs[index];
+                  return Row(
+                    children: [
+                      CircleAvatar(radius: 16, backgroundColor: cs.surfaceContainerHighest, child: Icon(t.tipo == 'entrada' ? Icons.south_west : Icons.north_east, size: 16)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.categoria, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(DateFormat('dd MMM').format(t.data), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
