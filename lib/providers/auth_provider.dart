@@ -95,18 +95,9 @@ class AuthProvider extends ChangeNotifier {
       if (e.code == 'user-not-found' ||
           e.code == 'invalid-credential' ||
           e.code == 'invalid-login-credentials') {
-        try {
-          final methods = await _auth.fetchSignInMethodsForEmail(normalizedEmail);
-          if (methods.isNotEmpty && !methods.contains('password')) {
-            _errorMessage =
-                'Este e-mail já existe com outro método (${methods.join(', ')}). '
-                'Use login social ou redefina o acesso.';
-          } else {
-            _errorMessage = _mapAuthError(e.code);
-          }
-        } catch (_) {
-          _errorMessage = _mapAuthError(e.code);
-        }
+        _errorMessage =
+            '${_mapAuthError(e.code)} Se sua conta foi criada com Google/Apple, '
+            'entre pelo botão social correspondente.';
       } else {
         _errorMessage = _mapAuthError(e.code);
       }
