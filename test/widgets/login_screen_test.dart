@@ -27,6 +27,14 @@ class _FakeAuth extends app_auth.AuthProvider {
 
   @override
   Future<bool> signIn({required String email, required String password}) async {
+    return signInWithEmailPassword(email: email, password: password);
+  }
+
+  @override
+  Future<bool> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
     _loading = true;
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 30));
