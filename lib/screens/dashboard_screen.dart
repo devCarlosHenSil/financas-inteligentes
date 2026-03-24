@@ -732,6 +732,125 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildSideRail() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final items = const [
+      (Icons.dashboard_outlined, 'Dashboard', true),
+      (Icons.receipt_long_outlined, 'Transações', false),
+      (Icons.account_balance_wallet_outlined, 'Pagamentos', false),
+      (Icons.credit_card_outlined, 'Cartões', false),
+      (Icons.bar_chart_outlined, 'Relatórios', false),
+      (Icons.settings_outlined, 'Configurações', false),
+    ];
+
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.currency_exchange, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('finanças', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...items.map((item) {
+            final selected = item.$3;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selected ? cs.primary.withValues(alpha: 0.16) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(item.$1, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
+                  title: Text(item.$2, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Aceite cartões e pix', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(onPressed: () {}, child: const Text('Configurar')),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentTransactionsCard(TransactionProvider tx) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final txs = tx.transactionsFiltradas.take(5).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recent Transaction', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('Movimentações mais recentes do período.', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          if (txs.isEmpty)
+            Text('Sem transações no período.', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+          else
+            ...txs.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      CircleAvatar(radius: 16, backgroundColor: cs.surfaceContainerHighest, child: Icon(t.tipo == 'entrada' ? Icons.south_west : Icons.north_east, size: 16)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.categoria, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(DateFormat('dd MMM').format(t.data), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -743,69 +862,67 @@ class DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              if (tx.isLoading)
-                LinearProgressIndicator(
-                  minHeight: 2,
-                  color: colorScheme.primary,
-                  backgroundColor: colorScheme.surfaceContainerHigh,
-                ),
-              const SizedBox(height: 8),
-              _buildPremiumHeader(tx.saldo),
-              const SizedBox(height: 10),
-              _buildSignatureLedgerStrip(tx),
-              const SizedBox(height: 10),
+              _buildSideRail(),
+              const SizedBox(width: 12),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isStacked = constraints.maxWidth < 900;
-                    if (isStacked) {
-                      return Column(
-                        children: [
-                          Expanded(
-                            child: _buildChartCard(
-                              title: 'Entradas por Categoria',
-                              data: tx.entradasPorCategoria,
-                              isIncome: true,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPremiumHeader(tx.saldo),
+                      const SizedBox(height: 10),
+                      _buildSignatureLedgerStrip(tx),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Entradas por Categoria',
+                                      data: tx.entradasPorCategoria,
+                                      isIncome: true,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildRecentTransactionsCard(tx)),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          Expanded(
-                            child: _buildChartCard(
-                              title: 'Saídas por Categoria',
-                              data: tx.saidasPorCategoria,
-                              isIncome: false,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildChartCard(
+                                      title: 'Saídas por Categoria',
+                                      data: tx.saidasPorCategoria,
+                                      isIncome: false,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _buildInsightsAndActions(tx.saldo)),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: _buildChartCard(
-                            title: 'Entradas por Categoria',
-                            data: tx.entradasPorCategoria,
-                            isIncome: true,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildChartCard(
-                            title: 'Saídas por Categoria',
-                            data: tx.saidasPorCategoria,
-                            isIncome: false,
-                          ),
+                          ],
                         ),
                       ],
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 10),
-              _buildInsightsAndActions(tx.saldo),
             ],
           ),
         ),
