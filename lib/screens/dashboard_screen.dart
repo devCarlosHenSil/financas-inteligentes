@@ -757,7 +757,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildSideRail() {
+  Widget _buildPrimarySideRail() {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final items = const [
@@ -838,7 +838,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildRecentTransactionsCard(TransactionProvider tx) {
+  Widget _buildRecentTransactionsPanel(TransactionProvider tx) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final txs = tx.transactionsFiltradas.take(5).toList();
@@ -890,127 +890,6 @@ class DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSideRail() {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final items = const [
-      {'icon': Icons.dashboard_outlined, 'label': 'Dashboard', 'selected': true},
-      {'icon': Icons.receipt_long_outlined, 'label': 'Transações', 'selected': false},
-      {'icon': Icons.account_balance_wallet_outlined, 'label': 'Pagamentos', 'selected': false},
-      {'icon': Icons.credit_card_outlined, 'label': 'Cartões', 'selected': false},
-      {'icon': Icons.bar_chart_outlined, 'label': 'Relatórios', 'selected': false},
-      {'icon': Icons.settings_outlined, 'label': 'Configurações', 'selected': false},
-    ];
-
-    return Container(
-      width: 250,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.currency_exchange, color: cs.primary),
-              const SizedBox(width: 8),
-              Text('finanças', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            ],
-          ),
-          const SizedBox(height: 18),
-          ...items.map((item) {
-            final selected = item['selected'] as bool;
-            final icon = item['icon'] as IconData;
-            final label = item['label'] as String;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: selected ? cs.primary.withValues(alpha: 0.16) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(icon, size: 19, color: selected ? cs.primary : cs.onSurfaceVariant),
-                  title: Text(label, style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
-                ),
-              ),
-            );
-          }),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Aceite cartões e pix', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(onPressed: () {}, child: const Text('Configurar')),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentTransactionsCard(TransactionProvider tx) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final txs = tx.transactionsFiltradas.take(5).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recent Transaction', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text('Movimentações mais recentes do período.', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 12),
-          if (txs.isEmpty)
-            Text('Sem transações no período.', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
-          else
-            ...txs.map((t) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      CircleAvatar(radius: 16, backgroundColor: cs.surfaceContainerHighest, child: Icon(t.tipo == 'entrada' ? Icons.south_west : Icons.north_east, size: 16)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(t.categoria, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Text(DateFormat('dd MMM').format(t.data), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                      Text(_currencyFormatter.format(t.valor), style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                )),
-        ],
-      ),
-    );
-  }
-
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -1024,7 +903,7 @@ class DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              _buildSideRail(),
+              _buildPrimarySideRail(),
               const SizedBox(width: 12),
               Expanded(
                 child: Container(
@@ -1054,7 +933,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                Expanded(child: _buildRecentTransactionsCard(tx)),
+                                Expanded(child: _buildRecentTransactionsPanel(tx)),
                               ],
                             ),
                           ),
