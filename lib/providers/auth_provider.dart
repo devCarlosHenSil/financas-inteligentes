@@ -143,9 +143,18 @@ class AuthProvider extends ChangeNotifier {
         final provider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('profile');
-        await _auth.signInWithRedirect(provider);
-        _setLoading(false);
-        return true;
+        try {
+          final result = await _auth.signInWithPopup(provider);
+          _setLoading(false);
+          return result.user != null;
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'popup-blocked' || e.code == 'popup-closed-by-user') {
+            await _auth.signInWithRedirect(provider);
+            _setLoading(false);
+            return true;
+          }
+          rethrow;
+        }
       }
       _googleSignIn ??= GoogleSignIn();
       final googleUser = await _googleSignIn!.signIn();
