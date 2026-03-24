@@ -156,8 +156,11 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
     final total = items.fold<double>(0, (sum, item) => sum + item.valor);
 
-    return Column(
-      children: List.generate(items.length, (index) {
+    return ListView.separated(
+      itemCount: items.length,
+      padding: EdgeInsets.zero,
+      separatorBuilder: (_, __) => const SizedBox(height: 4),
+      itemBuilder: (context, index) {
         final item = items[index];
         final color = _categoryColor(item.nome, isIncome: isIncome, index: index);
         final percent = total == 0 ? 0.0 : (item.valor / total) * 100;
@@ -165,7 +168,6 @@ class DashboardScreenState extends State<DashboardScreen> {
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          margin: const EdgeInsets.only(bottom: 4),
           decoration: BoxDecoration(
             color: isSelected
                 ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
@@ -200,7 +202,7 @@ class DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         );
-      }),
+      },
     );
   }
 
@@ -261,26 +263,72 @@ class DashboardScreenState extends State<DashboardScreen> {
                   fontWeight: FontWeight.w700, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: _buildPieChart(items,
-                  isIncome: isIncome, touchedIndex: touchedIndex),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              selection == null
-                  ? 'Toque em uma fatia ou use a legenda abaixo.'
-                  : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
             SizedBox(
-              width: double.infinity,
-              child: _buildCategoryList(
-                items,
-                isIncome: isIncome,
-                touchedIndex: touchedIndex,
+              height: 14,
+              child: Text(
+                selection == null
+                    ? 'Toque em uma fatia ou use a legenda.'
+                    : '${selection.item.nome} • ${_currencyFormatter.format(selection.item.valor)} (${selection.percent.toStringAsFixed(1)}%)',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final horizontal = constraints.maxWidth >= 640;
+                  if (horizontal) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: _buildPieChart(
+                            items,
+                            isIncome: isIncome,
+                            touchedIndex: touchedIndex,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 4,
+                          child: _buildCategoryList(
+                            items,
+                            isIncome: isIncome,
+                            touchedIndex: touchedIndex,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _buildPieChart(
+                          items,
+                          isIncome: isIncome,
+                          touchedIndex: touchedIndex,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        flex: 4,
+                        child: _buildCategoryList(
+                          items,
+                          isIncome: isIncome,
+                          touchedIndex: touchedIndex,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
