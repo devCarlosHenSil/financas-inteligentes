@@ -73,11 +73,22 @@ class AuthProvider extends ChangeNotifier {
   // ── Login e-mail/senha ────────────────────────────────────────────────────
 
   Future<bool> signIn({required String email, required String password}) async {
+    return signInWithEmailPassword(email: email, password: password);
+  }
+
+  Future<bool> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
     _setLoading(true);
     _errorMessage = null;
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedPassword = password.trim();
     try {
       await _auth.signInWithEmailAndPassword(
-          email: email.trim(), password: password);
+        email: normalizedEmail,
+        password: normalizedPassword,
+      );
       _setLoading(false);
       return true;
     } on FirebaseAuthException catch (e) {
@@ -94,9 +105,13 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register({required String email, required String password}) async {
     _setLoading(true);
     _errorMessage = null;
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedPassword = password.trim();
     try {
       await _auth.createUserWithEmailAndPassword(
-          email: email.trim(), password: password);
+        email: normalizedEmail,
+        password: normalizedPassword,
+      );
       _setLoading(false);
       return true;
     } on FirebaseAuthException catch (e) {
@@ -372,6 +387,9 @@ class AuthProvider extends ChangeNotifier {
       case 'user-not-found':           return 'E-mail nao cadastrado.';
       case 'wrong-password':           return 'Senha incorreta.';
       case 'invalid-credential':       return 'E-mail ou senha incorretos.';
+      case 'invalid-login-credentials': return 'E-mail ou senha incorretos.';
+      case 'missing-email':            return 'Informe seu e-mail.';
+      case 'missing-password':         return 'Informe sua senha.';
       case 'email-already-in-use':     return 'E-mail ja cadastrado.';
       case 'weak-password':            return 'Senha muito fraca. Use pelo menos 6 caracteres.';
       case 'invalid-email':            return 'E-mail invalido.';
